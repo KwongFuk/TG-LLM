@@ -17,7 +17,7 @@ model_name = ['gpt-3.5-turbo', 'gpt-4-1106-preview', 'Llama-2-7b-hf', 'Llama-2-1
 
 f_SFT_TGLLM = 1
 f_inference_ICL = 0
-
+f_ppl = 0
 
 
 if f_SFT_TGLLM:
@@ -26,6 +26,8 @@ if f_SFT_TGLLM:
 if f_inference_ICL:
     folder_path = f'../results/{dataset_name}_ICL_{model_name}'
 
+if f_ppl:
+    folder_path += '_ppl'
 
 num_question_cat = 1
 if dataset_name == 'TGQA':
@@ -121,8 +123,10 @@ for i in range(num_test_samples):
 
 
 
-
+# for results based on perplexity, we only need EM
 print('EM:')
+
+
 
 EM_dict = []
 for i in range(num_question_cat):
