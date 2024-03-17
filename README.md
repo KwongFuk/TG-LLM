@@ -34,8 +34,10 @@ Preparation
 cd TG-LLM
 mkdir model_weights
 mkdir results
+mkdir dataset
 
-# download the datasets
+cd dataset
+# download the datasets from the link below
 
 # create a new environment with anaconda and install the necessary Python packages
 ```
