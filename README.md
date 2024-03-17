@@ -40,6 +40,9 @@ For other leading LLMs (GPT series/Llama2 family)
 ```sh
 cd src
 python Inference_in_context_learning.py
+
+# to obtain results based on perplexity
+python Inference_in_context_learning_ppl.py
 ```
 
 For evaluation
