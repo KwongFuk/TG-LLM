@@ -40,7 +40,7 @@ f_rewrite = 1 # whether rewrite existing test results
 
 
 dataset_name = ['TGQA', 'TimeQA_easy', 'TimeQA_hard', 'TempReason_l2', 'TempReason_l3'][dataset_selection]
-
+Q_type = ['', 'easy', 'hard', 'l2', 'l3'][dataset_selection]
 
 
 
@@ -319,7 +319,7 @@ def read_data(dataset_name, filename, f_CoT_bs=0, f_data_aug=0):
                      'CoT': [CoT_sampling(item["CoT"], item['CoT_sample_prob']) if "CoT" in item else None for item in data],
                      'C': [item["candidates"] if "candidates" in item else None for item in data],
                      'id': [item['id'] for item in data],
-                     'Q-Type': [item['Q-Type'] if 'Q-Type' in item else None for item in data]}
+                     'Q-Type': [item['Q-Type'] if 'Q-Type' in item else Q_type for item in data]}
     else:
         # Convert list of dictionaries to the desired format
         data_dict = {'story': [item["story"] for item in data],
@@ -330,7 +330,7 @@ def read_data(dataset_name, filename, f_CoT_bs=0, f_data_aug=0):
                      'CoT': [item["CoT"] if "CoT" in item else None for item in data],
                      'C': [item["candidates"] if "candidates" in item else None for item in data],
                      'id': [item['id'] for item in data],
-                     'Q-Type': [item['Q-Type'] if 'Q-Type' in item else None for item in data]}
+                     'Q-Type': [item['Q-Type'] if 'Q-Type' in item else Q_type for item in data]}
 
     # Convert your data into a dataset
     dataset = Dataset.from_dict(data_dict)
@@ -363,6 +363,8 @@ data_val = read_data(dataset_name, filename, f_CoT_bs, f_data_aug)
 
 filename = ['TGSR_test.json', 'TGSR_easy_test.json', 'TGSR_hard_test.json', 'TGSR_l2_test.json', 'TGSR_l3_test.json'][dataset_selection]
 data_test = read_data(dataset_name, filename)
+
+
 
 
 print(data_train)
@@ -404,7 +406,10 @@ def my_generate_prompt(TG, EK, Q, CoT, A, Q_type=None, mode=None, eos_token="</s
     if f_ICL and mode == 'test':
         if dataset_name == 'TGQA':
             Q_type = f'Q{Q_type}'
-        file_path = f'../materials/{dataset_name.split('_')[0]}/prompt_examples_TGSR_{Q_type}.txt'
+        if Q_type is None:
+            file_path = f'../materials/{dataset_name.split('_')[0]}/prompt_examples_TGSR.txt'
+        else:
+            file_path = f'../materials/{dataset_name.split('_')[0]}/prompt_examples_TGSR_{Q_type}.txt'
         with open(file_path) as txt_file:
             prompt_examples = txt_file.read()
 

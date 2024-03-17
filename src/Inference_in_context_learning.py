@@ -35,6 +35,7 @@ f_shorten_story = 1 # whether shorten the story
 
 dataset_name = ['TGQA', 'TimeQA_easy', 'TimeQA_hard', 'TempReason_l2', 'TempReason_l3'][dataset_selection]
 filename = ['TGSR_test.json', 'TGSR_easy_test.json', 'TGSR_hard_test.json', 'TGSR_l2_test.json', 'TGSR_l3_test.json'][dataset_selection]
+Q_type = [None, None, None, 'l2', 'l3'][dataset_selection]
 model_name = ['gpt-3.5-turbo', 'gpt-4-1106-preview', 'Llama-2-7b-hf', 'Llama-2-13b-hf', 'Llama-2-70b-hf'][model_selection]
 
 
@@ -51,7 +52,7 @@ def read_data(dataset_name, filename):
                  'CoT': [item["CoT"] if "CoT" in item else None for item in data],
                  'C': [item["candidates"] if "candidates" in item else None for item in data],
                  'id': [item['id'] for item in data],
-                 'Q-Type': [item['Q-Type'] if 'Q-Type' in item else None for item in data]}
+                 'Q-Type': [item['Q-Type'] if 'Q-Type' in item else Q_type for item in data]}
 
     # Convert your data into a dataset
     dataset = Dataset.from_dict(data_dict)
@@ -88,9 +89,16 @@ def my_generate_prompt(story, Q, C, Q_type=None):
         if dataset_name == 'TGQA':
             Q_type = f'Q{Q_type}'
         if not f_using_CoT:
-            file_path = f'../materials/{dataset_name.split('_')[0]}/prompt_examples_ICL_SP_{Q_type}.txt'
+            if Q_type is None:
+                file_path = f'../materials/{dataset_name}/prompt_examples_ICL_SP.txt'
+            else:
+                file_path = f'../materials/{dataset_name}/prompt_examples_ICL_SP_{Q_type}.txt'
         else:
-            file_path = f'../materials/{dataset_name.split('_')[0]}/prompt_examples_ICL_CoT_{Q_type}.txt'
+            if Q_type is None:
+                file_path = f'../materials/{dataset_name}/prompt_examples_ICL_CoT.txt'
+            else:
+                file_path = f'../materials/{dataset_name}/prompt_examples_ICL_CoT_{Q_type}.txt'
+
         with open(file_path) as txt_file:
             prompt_examples = txt_file.read()
 
