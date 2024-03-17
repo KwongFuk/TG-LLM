@@ -131,7 +131,8 @@ for i in range(5):
 
 model_name_cmp = f'meta-llama/{model_name}'
 tokenizer = AutoTokenizer.from_pretrained(model_name_cmp)
-tokenizer.pad_token_id = tokenizer.eos_token_id    # for open-ended generation
+tokenizer.pad_token_id = 0
+tokenizer.padding_side = 'left'
 model = AutoModelForCausalLM.from_pretrained(model_name_cmp,
                                             load_in_8bit=True,
                                             device_map="auto"
@@ -143,8 +144,6 @@ model = AutoModelForCausalLM.from_pretrained(model_name_cmp,
 
 
 def one_batch(input_prompts, samples, file_paths):
-    input_tokens = tokenizer(input_prompts, padding='longest', return_tensors="pt")["input_ids"].to("cuda")
-
     for j in range(len(input_prompts)):
         cur_sample = samples[j]
         context_len = tokenizer(input_prompts[j], return_tensors="pt")["input_ids"].shape[1]
@@ -183,10 +182,6 @@ def process_CoT(prediction):
 
 
 
-
-
-tokenizer.pad_token_id = 0
-tokenizer.padding_side = 'left'
 
 
 

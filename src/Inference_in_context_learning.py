@@ -207,7 +207,7 @@ folder_path = f'../results/{dataset_name}_ICL_{model_name}'
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
-
+batchsize = 8
 input_prompts = []
 file_paths = []
 samples = []
@@ -223,7 +223,7 @@ for i in range(len(data_test)):
     samples.append(sample)
     file_paths.append(file_path)
 
-    if len(input_prompts) >= 8:
+    if len(input_prompts) >= batchsize:
         one_batch(input_prompts, samples, file_paths)
         input_prompts = []
         file_paths = []
