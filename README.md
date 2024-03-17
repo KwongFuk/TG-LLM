@@ -31,9 +31,16 @@ For our TG-LLM framework
 
 ```sh
 cd src
+
+# step 1: text-to-temporal graph translation
 python SFT_with_LoRA_text_to_TG_Trans.py
+
+# step 2: neuro-symbolic reasoning
 python CoT_bootstrap.py
 python SFT_with_LoRA_Symbolic_Reasoning.py
+
+# to obtain results based on perplexity
+python SFT_with_LoRA_Symbolic_Reasoning_ppl.py
 ```
 
 For other leading LLMs (GPT series/Llama2 family)
