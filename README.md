@@ -27,6 +27,19 @@ TG-LLM/
 └── results/
 ```
 
+Preparation
+```sh
+# git clone this repo
+
+cd TG-LLM
+mkdir model_weights
+mkdir results
+
+# download the datasets
+
+# create a new environment with anaconda and install the necessary Python packages
+```
+
 For our TG-LLM framework
 
 ```sh
