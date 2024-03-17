@@ -298,7 +298,7 @@ def read_data(dataset_name, filename, f_CoT_bs=0, f_data_aug=0):
     with open(file_path) as json_file:
         data = json.load(json_file)
 
-    if f_data_aug:
+    if f_data_aug and dataset_name in ['TGQA']:
         data_aug = []
         for sample in data:
             TG, EK, Q, CoT, C, A = data_augmentation(sample['TG'], sample['EK'], sample['question'], sample['CoT'], sample['candidates'], sample['answer'], 
