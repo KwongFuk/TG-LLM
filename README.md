@@ -8,7 +8,7 @@ Our framework:
   <img src='https://github.com/xiongsiheng/TG-LLM/blob/main/misc/Framework.png' width=400>
 </p>
 
-# How to run
+## Quick Start
 
 We use [Hugging Face](https://huggingface.co/) platform to load the Llama2 model family. Make sure you have an account ([Guidance](https://huggingface.co/blog/llama2)).
 
@@ -77,6 +77,9 @@ python Evaluation.py
 ## Datasets
 
 All the datasets (TGQA, TimeQA, TempReason) can be found [here](https://huggingface.co/datasets/sxiong/TGQA).
+
+## Contact
+If you have any inquiries, please feel free to raise an issue or reach out to sxiong45@gatech.edu.
 
 ## Citation
 ```
