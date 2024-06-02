@@ -1,24 +1,12 @@
 import sys
 import json
-import random
 import os
-import re
-import argparse
-import numpy as np
 import copy
 
 
 
 import torch
-import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from datasets import load_dataset
-from peft import (
-        get_peft_model, 
-        prepare_model_for_kbit_training, 
-        LoraConfig
-    )
-from trl import SFTTrainer
 from peft import PeftModel
 from datasets import Dataset
 
@@ -30,7 +18,7 @@ os.environ["WANDB_DISABLED"] = "true"
 
 
 
-dataset_selection = 0
+dataset_selection = 0 # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
 f_ICL = 1  # whether use in-context learning during test
 f_rewrite = 1 # whether rewrite existing test results
 
@@ -43,7 +31,10 @@ dataset_name_short = dataset_name.split('_')[0]
 
 
 
-def read_data(dataset_name, filename, f_CoT_bs=0, f_data_aug=0):
+def read_data(dataset_name, filename):
+    '''
+    Read the data from the json file
+    '''
     file_path = f'../dataset/{dataset_name}/{filename}'
 
     with open(file_path) as json_file:
@@ -77,6 +68,7 @@ print(data_test)
 
 
 
+# use estimated temporal graph for test
 
 TG_pred = {}
 path_TG_pred = f'../results/{dataset_name_short}_story_TG_trans/'
@@ -93,6 +85,9 @@ for filename in os.listdir(path_TG_pred):
 
 
 def process_id(sample_id):
+    '''
+    Process the id to get the story id
+    '''
     story_id = sample_id
     if dataset_name_short == 'TimeQA':
         story_id = story_id[:-2]
@@ -102,6 +97,22 @@ def process_id(sample_id):
 
 
 def my_generate_prompt(TG, EK, Q, CoT, A, Q_type=None, mode=None, eos_token="</s>"):
+    '''
+    Generate the prompt for the model
+
+    Args:
+    TG: the temporal graph
+    EK: the external knowledge
+    Q: the question
+    CoT: the context of time
+    A: the answer
+    Q_type: the type of the question
+    mode: the mode of the prompt generation
+    eos_token: the end of the sentence token
+
+    Return:
+    prompt: the generated prompt
+    '''
     if isinstance(TG, list):
         TG = '\n'.join(TG)
 
@@ -154,7 +165,7 @@ for i in range(5):
 
 
 
-model_name = "meta-llama/Llama-2-13b-hf"
+model_name = "meta-llama/Llama-2-13b-hf" # you can change to other models
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 
@@ -169,9 +180,20 @@ model = AutoModelForCausalLM.from_pretrained(model_name,
 
 
 
-
-
 def one_batch(tokenizer, input_prompts, samples, file_paths):
+    '''
+    Given a batch of input prompts and candidates, calculate the perplexity of the candidates and choose the best one. Then save the results to the corresponding files.
+    Todo: The two-round loops can be optimized to accelerate the process.
+
+    Args:
+    tokenizer: the tokenizer
+    input_prompts: the input prompts
+    samples: the samples
+    file_paths: the file paths to save the results
+
+    Return:
+    None
+    '''
     for j in range(len(input_prompts)):
         cur_sample = samples[j]
         context_len = tokenizer(input_prompts[j], return_tensors="pt")["input_ids"].shape[1]
@@ -199,6 +221,9 @@ def one_batch(tokenizer, input_prompts, samples, file_paths):
 
 
 def process_CoT(prediction):
+    '''
+    Remove the final answer from the CoT since we need to calculate the perplexity of the candidates.
+    '''
     prediction = prediction.strip()
     for identifier in [' the answer is ', 'Answer:', ' answer is:', ' the correct answer is', ' the answers are ']:
         if identifier in prediction:
@@ -227,11 +252,12 @@ if not os.path.exists(folder_path_past_res):
 
 
 
-batchsize = 8
+batch_size = 8
 input_prompts = []
 file_paths = []
 samples = []
 for i in range(len(data_test)):
+    # collect the prompts as a batch
     file_path = folder_path + f'/{str(i)}.json'
     if os.path.exists(file_path) and (not f_rewrite):
         continue
@@ -256,7 +282,7 @@ for i in range(len(data_test)):
     samples.append(sample)
     file_paths.append(file_path)
 
-    if len(input_prompts) >= batchsize:
+    if len(input_prompts) >= batch_size:
         one_batch(tokenizer, input_prompts, samples, file_paths)
         input_prompts = []
         file_paths = []

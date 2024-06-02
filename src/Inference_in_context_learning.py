@@ -1,18 +1,9 @@
 import sys
 import json
-import random
 import os
-import re
-import argparse
-import numpy as np
-import copy
-
-
 
 import torch
-import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from datasets import load_dataset
 from datasets import Dataset
 import openai
 import time
@@ -25,8 +16,8 @@ os.environ["WANDB_DISABLED"] = "true"
 
 
 
-dataset_selection = 0
-model_selection = 2
+dataset_selection = 0 # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
+model_selection = 2 # 0: gpt-3.5-turbo, 1: gpt-4-1106-preview, 2: Llama-2-7b-hf, 3: Llama-2-13b-hf, 4: Llama-2-70b-hf
 f_using_CoT = 0 # whether use CoT
 f_ICL = 1  # whether use in-context learning during test
 f_rewrite = 1 # whether rewrite existing test results
@@ -41,6 +32,9 @@ model_name = ['gpt-3.5-turbo', 'gpt-4-1106-preview', 'Llama-2-7b-hf', 'Llama-2-1
 
 
 def read_data(dataset_name, filename):
+    '''
+    Read the data from the json file and convert it into a dataset
+    '''
     file_path = f'../dataset/{dataset_name.split('_')[0]}/{filename}'
     with open(file_path) as json_file:
         data = json.load(json_file)
@@ -68,16 +62,30 @@ print(data_test)
 
 
 
-def my_gpt_completion(openai_model, messages, timeout, max_tokens=128, wait_time=0):
-    openai.api_key =   # add your own api_key
+def my_gpt_completion(openai_model, messages, timeout, max_new_tokens=128, wait_time=0):
+    '''
+    Use the GPT model to generate the completion
+    We can add exception handling here to avoid interruption
+
+    args:
+    openai_model: the model name
+    messages: the messages in the conversation
+    timeout: the timeout for the request
+    max_new_tokens: the maximum new tokens for the completion
+    wait_time: the wait time between requests
+
+    return:
+    response: the generated response, str
+    '''
+    openai.api_key =   # add your own api_key here (you can look at the openai website to get one)
     completion = openai.ChatCompletion.create(model=openai_model,
                                               messages=messages,
                                               request_timeout = timeout,
                                               temperature=0.7,
-                                              max_tokens=max_tokens
+                                              max_tokens=max_new_tokens
                                             )
     response = completion['choices'][0]["message"]["content"]
-    time.sleep(wait_time)
+    time.sleep(wait_time) # wait for a while to avoid the rate limit
 
     return response
 
@@ -85,7 +93,19 @@ def my_gpt_completion(openai_model, messages, timeout, max_tokens=128, wait_time
 
 
 def my_generate_prompt(story, Q, C, Q_type=None):
-    if f_ICL:
+    '''
+    Gnerate the prompt for the model
+
+    args:
+    story: the story, str
+    Q: the question, str
+    C: the candidates, list
+    Q_type: the question type, str
+
+    return:
+    prompt: the generated prompt, str
+    '''
+    if f_ICL: # use in-context learning
         if dataset_name == 'TGQA':
             Q_type = f'Q{Q_type}'
         if not f_using_CoT:
@@ -104,8 +124,8 @@ def my_generate_prompt(story, Q, C, Q_type=None):
 
     story = story.replace('\n', ' ')
 
-    if f_shorten_story:
-        story = ' '.join(story.split(' ')[:2000])
+    if f_shorten_story: # shorten the story
+        story = ' '.join(story.split(' ')[:2000]) # only simply keep the first 2000 words
 
     if '(' not in C[0] and ')' not in C[0]:
         C = ['( ' + cand + ' )' for cand in C]
@@ -155,6 +175,18 @@ if 'Llama' in model_name:
 
 
 def one_batch(input_prompts, samples, file_paths, max_new_tokens=512):
+    '''
+    Generate the completion for one batch of input prompts
+
+    args:
+    input_prompts: the input prompts, list
+    samples: the samples, list
+    file_paths: the file paths to save the results, list
+    max_new_tokens: the maximum new tokens for the completion
+
+    return:
+    None
+    '''
     if 'Llama' in model_name:
         input_tokens = tokenizer(input_prompts, padding='longest', return_tensors="pt")["input_ids"].to("cuda")
 
@@ -186,7 +218,7 @@ def one_batch(input_prompts, samples, file_paths, max_new_tokens=512):
         for j in range(len(input_prompts)):
             messages = []
             messages.append({"role": "user", "content": input_prompts[j]})
-            op = my_gpt_completion(model_name, messages, 600, max_tokens=max_new_tokens, wait_time=0.5)
+            op = my_gpt_completion(model_name, messages, 600, max_new_tokens=max_new_tokens, wait_time=0.5)
 
             cur_sample = samples[j]
             cur_sample.update({'prediction': op})
@@ -207,11 +239,12 @@ folder_path = f'../results/{dataset_name}_ICL_{model_name}'
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
-batchsize = 8
+batch_size = 8
 input_prompts = []
 file_paths = []
 samples = []
 for i in range(len(data_test)):
+    # collect the prompts as a batch
     file_path = folder_path + f'/{str(i)}.json'
     if os.path.exists(file_path) and (not f_rewrite):
         continue
@@ -223,7 +256,7 @@ for i in range(len(data_test)):
     samples.append(sample)
     file_paths.append(file_path)
 
-    if len(input_prompts) >= batchsize:
+    if len(input_prompts) >= batch_size:
         one_batch(input_prompts, samples, file_paths)
         input_prompts = []
         file_paths = []

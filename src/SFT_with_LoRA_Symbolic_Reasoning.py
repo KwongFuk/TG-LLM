@@ -2,9 +2,6 @@ import sys
 import json
 import random
 import os
-import re
-import argparse
-import numpy as np
 import copy
 
 
@@ -30,9 +27,9 @@ os.environ["WANDB_DISABLED"] = "true"
 
 
 
-dataset_selection = 0
-f_train = 1
-f_test = 1
+dataset_selection = 0 # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
+f_train = 1 # whether train the model
+f_test = 1  # whether test the model
 f_CoT_bs = 1 # whether use CoT bootstrapping
 f_data_aug = 1 # whether use data augmentation
 f_ICL = 1  # whether use in-context learning during test
@@ -46,6 +43,29 @@ dataset_name_short = dataset_name.split('_')[0]
 
 
 def data_augmentation(TG, EK, Q, CoT, C, A, flag_rm_irr_edges=False, flag_change_relations=False, flag_change_entities=False, flag_change_times=False):
+    '''
+    Augment the data by randomly deleting irrelevant edges and changing the entities, relations, and times.
+
+    args:
+        TG: list of strings or string, temporal graph
+        EK: list of strings or string, exteral knowledge
+        Q: string, question
+        CoT: list of strings, chain of thought
+        C: list of strings, candidates
+        A: string, answer
+        flag_rm_irr_edges: bool, whether to remove irrelevant edges
+        flag_change_relations: bool, whether to change relations
+        flag_change_entities: bool, whether to change entities
+        flag_change_times: bool, whether to change times
+
+    return:
+        TG: list of strings, augmented temporal graph
+        EK: list of strings, augmented exteral knowledge
+        Q: string, augmented question
+        CoT: list of strings, augmented chain of thought
+        C: list of strings, augmented candidates
+        A: string, augmented answer
+    '''
     flag1, flag2 = 0, 0
     if isinstance(TG, list):
         TG = '\n'.join(TG)
@@ -79,6 +99,9 @@ def data_augmentation(TG, EK, Q, CoT, C, A, flag_rm_irr_edges=False, flag_change
 
 
 def rm_irr_edges(TG, CoT, Q):
+    '''
+    Remove irrelevant edges in the temporal graph.
+    '''
     facts_ls = TG.split('\n')
     rm_facts = [i for (i, fact) in enumerate(facts_ls) if (fact[:-len(fact.split(')')[-1])].strip() not in CoT) and (fact[:-len(fact.split(')')[-1])].strip() not in Q)]
     random.shuffle(rm_facts)
@@ -91,6 +114,9 @@ def rm_irr_edges(TG, CoT, Q):
 
 
 def change_rels(TG):
+    '''
+    Change relations in the temporal graph.
+    '''
     with open(f'../materials/{dataset_name_short}/rel_synonyms.txt', 'r') as file:
         contents = file.readlines()
 
@@ -120,6 +146,9 @@ def change_rels(TG):
 
 
 def change_times(TG, prompts):
+    '''
+    Change times in the temporal graph.
+    '''
     facts_ls = TG.split('\n')
     mapping_time = {}
 
@@ -148,6 +177,12 @@ def change_times(TG, prompts):
 
 
 def collect_entity():
+    '''
+    Collect subject and object entities for each relation.
+
+    return:
+        rel_entity_dict: dict, subject and object entities for each relation
+    '''
     with open(f'../materials/{dataset_name_short}/rel_dict.txt', 'r') as file:
         contents = file.readlines()
 
@@ -202,6 +237,15 @@ def collect_entity():
 
 
 def collect_entity_v2(existing_names=None):
+    '''
+    Collect random subject and object entity names for each relation.
+
+    args:
+        existing_names: dict, existing entity names (which we want to exclude)
+
+    return:
+        ent_names: dict, random entity names
+    '''
     path = f'../materials/{dataset_name_short}/random_names'
     with open(f'{path}/sub_total.txt') as file:
         context = file.readlines()
@@ -233,6 +277,16 @@ def collect_entity_v2(existing_names=None):
 
 
 def change_entities(TG, prompts):
+    '''
+    Change entities in the temporal graph.
+    
+    args:
+        TG: list of strings, temporal graph
+        prompts: list of strings or list of list of strings, prompts
+
+    return:
+        prompts_new: list of strings or list of list of strings, augmented prompts
+    '''
     facts_ls = TG.split('\n')
     for fact in facts_ls:
         fact = fact[:-len(fact.split(')')[-1])].strip()[1:-1]
@@ -284,12 +338,27 @@ def change_entities(TG, prompts):
 
 
 def CoT_sampling(CoT, CoT_sample_prob):
+    '''
+    Sample a chain of thought according to the given probabilities.
+    '''
     return random.choices(CoT, weights=CoT_sample_prob, k=1)
 
 
 
 
 def read_data(dataset_name, filename, f_CoT_bs=0, f_data_aug=0):
+    '''
+    Read the data from the given file.
+
+    args:
+        dataset_name: string, dataset name
+        filename: string, file name
+        f_CoT_bs: bool, whether to use CoT bootstrapping
+        f_data_aug: bool, whether to use data augmentation
+
+    return:
+        dataset: Dataset, the dataset
+    '''
     if f_CoT_bs:
         file_path = f'../results/{dataset_name}_SR_bs/{filename}'
     else:
@@ -349,7 +418,7 @@ if f_data_aug:
     rel_entity_dict = collect_entity()
     random_entity_names = collect_entity_v2(rel_entity_dict)
 
-    global_ent_mapping = {}
+    global_ent_mapping = {} # we use a global mapping to ensure the consistency of entities and avoid confusion
     global_names_cnt = {}
     global_time_offset = random.randint(-20, 5)
 
@@ -376,6 +445,7 @@ print(data_test)
 
 
 if f_test:
+    # use estimated temporal graph for test
     TG_pred = {}
     path_TG_pred = f'../results/{dataset_name_short}_story_TG_trans/'
     for filename in os.listdir(path_TG_pred):
@@ -391,6 +461,9 @@ if f_test:
 
 
 def process_id(sample_id):
+    '''
+    Process the sample id.
+    '''
     story_id = sample_id
     if dataset_name_short == 'TimeQA':
         story_id = story_id[:-2]
@@ -400,6 +473,22 @@ def process_id(sample_id):
 
 
 def my_generate_prompt(TG, EK, Q, CoT, A, Q_type=None, mode=None, eos_token="</s>"):
+    '''
+    Generate the prompt for the model.
+
+    args:
+        TG: list of strings or string, temporal graph
+        EK: list of strings or string, exteral knowledge
+        Q: string, question
+        CoT: list of strings, chain of thought
+        A: string, answer
+        Q_type: string, question type
+        mode: string, mode
+        eos_token: string, eos token
+
+    return:
+        prompt: string, the prompt
+    '''
     if isinstance(TG, list):
         TG = '\n'.join(TG)
 
@@ -457,7 +546,7 @@ for i in range(5):
 
 
 
-model_name = "meta-llama/Llama-2-13b-hf"
+model_name = "meta-llama/Llama-2-13b-hf"  # you can change this to other models
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 
@@ -473,6 +562,7 @@ model = AutoModelForCausalLM.from_pretrained(model_name,
 
 
 if f_train:
+    # lora config
     lora_config = LoraConfig(
         r=8,
         lora_alpha=8,
@@ -526,6 +616,9 @@ if f_train:
 
 
     def formatting_func(sample):
+        '''
+        Given the sample, generate the prompt for the model.
+        '''
         output = []
         for g, e, q, cot, a in zip(sample['TG'], sample['EK'], sample['Q'], sample['CoT'], sample['A'], mode='train'):
             op = my_generate_prompt(g, e, q, cot, a)
@@ -557,6 +650,19 @@ if f_train:
 
 if f_test:
     def one_batch(tokenizer, input_prompts, samples, file_paths, max_new_tokens=512):
+        '''
+        Generate the predictions for one batch of samples and save the results.
+
+        args:
+            tokenizer: tokenizer
+            input_prompts: list of strings, input prompts
+            samples: list of dictionaries, samples
+            file_paths: list of strings, file paths
+            max_new_tokens: int, maximum number of new tokens
+
+        return:
+            None
+        '''
         input_tokens = tokenizer(input_prompts, padding='longest', return_tensors="pt")["input_ids"].to("cuda")
 
         with torch.cuda.amp.autocast():
@@ -601,6 +707,7 @@ if f_test:
     file_paths = []
     samples = []
     for i in range(len(data_test)):
+        # collect the prompts for 8 samples as a batch
         file_path = folder_path + f'/{str(i)}.json'
         if os.path.exists(file_path) and (not f_rewrite):
             continue

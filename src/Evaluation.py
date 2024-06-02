@@ -1,23 +1,22 @@
 import os
 import json
 import numpy as np
-import nltk
 from nltk.tokenize import word_tokenize
 import collections
 
 
 
 
-dataset_selection = 0
+dataset_selection = 0 # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
 model_selection = 0  # only need for inference with ICL
 
 dataset_name = ['TGQA', 'TimeQA_easy', 'TimeQA_hard', 'TempReason_l2', 'TempReason_l3'][dataset_selection]
 model_name = ['gpt-3.5-turbo', 'gpt-4-1106-preview', 'Llama-2-7b-hf', 'Llama-2-13b-hf', 'Llama-2-70b-hf'][model_selection]
 
 
-f_SFT_TGLLM = 1
-f_inference_ICL = 0
-f_ppl = 0
+f_SFT_TGLLM = 1 # whether use SFT with TGLLM
+f_inference_ICL = 0 # whether use inference with ICL
+f_ppl = 0 # whether use perplexity
 
 
 if f_SFT_TGLLM:
@@ -31,7 +30,7 @@ if f_ppl:
 
 num_question_cat = 1
 if dataset_name == 'TGQA':
-   num_question_cat = 9
+   num_question_cat = 9  # for TGQA, there are 9 question categories, and we use avarage of them to avoid imbalance problem
 
 
 
@@ -46,10 +45,12 @@ for i in range(num_question_cat):
 
 
 def calculate_EM(a_gold, a_pred):
+    # remove spaces and convert to lower case
     return a_gold.replace(' ', '').lower() == a_pred.replace(' ', '').lower()
 
 
 def calculate_F1(a_gold, a_pred):
+    # token-level F1
     gold_toks = word_tokenize(a_gold)
     pred_toks = word_tokenize(a_pred)
 
@@ -67,6 +68,9 @@ def calculate_F1(a_gold, a_pred):
 
 
 def parse_generation(pred):
+    '''
+    Parse the generated answer based on rules
+    '''
     for start_identifier in ['Answer:', 'answer is']:
         if start_identifier in pred:
             pred = pred.split(start_identifier)[-1].strip()
@@ -123,7 +127,7 @@ for i in range(num_test_samples):
 
 
 
-# for results based on perplexity, we only need EM
+# for results based on perplexity, we only need EM since we select the answer from the candidates 
 print('EM:')
 
 
@@ -133,7 +137,7 @@ for i in range(num_question_cat):
     if EM_dict[i][1] > 0:
         EM_dict[i][0] = EM_dict[i][0]/EM_dict[i][1]
 
-    print(i, cnt_correct[i], EM_dict[i])
+    print(i, EM_dict[i])
 
 print(np.mean([EM_dict[i][0] for i in range(num_question_cat)]))
 

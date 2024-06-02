@@ -1,39 +1,24 @@
 import sys
 import json
-import random
 import os
-import re
-import argparse
 import numpy as np
 import copy
 
 
 
 import torch
-import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from datasets import load_dataset
-from peft import (
-        get_peft_model, 
-        prepare_model_for_kbit_training, 
-        LoraConfig
-    )
-from trl import SFTTrainer
-from peft import PeftModel
 from datasets import Dataset
-
-
 
 os.environ["WANDB_DISABLED"] = "true"
 
 
 
 
-
-
-
-
 def read_data(dataset_name, filename):
+    '''
+    Read the data from the json file and convert it into a dataset
+    '''
     file_path = f'../dataset/{dataset_name.split('_')[0]}/{filename}'
     with open(file_path) as json_file:
         data = json.load(json_file)
@@ -57,7 +42,7 @@ def read_data(dataset_name, filename):
 
 
 
-dataset_selection = 0
+dataset_selection = 0 # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
 dataset_name = ['TGQA', 'TimeQA_easy', 'TimeQA_hard', 'TempReason_l2', 'TempReason_l3'][dataset_selection]
 
 
@@ -76,6 +61,17 @@ print(data_val)
 
 
 def my_generate_prompt(TG, EK, Q):
+    '''
+    Generate the prompt for the model
+    
+    Args:
+    TG: list of strings, each string is a time graph
+    EK: list of strings, each string is useful information
+    Q: string, the question
+    
+    Returns:
+    prompt: string, the prompt for the model
+    '''
     if isinstance(TG, list):
         TG = '\n'.join(TG)
 
@@ -102,7 +98,7 @@ for i in range(5):
 
 
 
-model_name = "meta-llama/Llama-2-13b-hf"
+model_name = "meta-llama/Llama-2-13b-hf" # you can change to other models
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 
@@ -115,6 +111,9 @@ model = AutoModelForCausalLM.from_pretrained(model_name,
 
 
 def process_CoT(ans_pred):
+    '''
+    Remove the final answer from the CoT since we need to calculate the perplexity of the candidates.
+    '''
     ans_pred = ans_pred.strip()
     for identifier in [' the answer is ', 'Answer:', ' answer is:', ' the correct answer is', ' the answers are ']:
         if identifier in ans_pred:
@@ -125,6 +124,16 @@ def process_CoT(ans_pred):
 
 
 def one_batch(input_prompts, samples):
+    '''
+    For each sample, calculate the contrastive score for each CoT. Then save the results to the corresponding files.
+    
+    Args:
+    input_prompts: the input prompts, list
+    samples: the samples, dict
+
+    Returns:
+    samples: the samples with the CoT sample probability, dict
+    '''
     gamma = 0.5
     for j in range(len(input_prompts)):
         context_len = tokenizer(input_prompts[j], return_tensors="pt")["input_ids"].shape[1]
@@ -166,6 +175,17 @@ def one_batch(input_prompts, samples):
 
 
 def CoT_bootstrap(data, filename):
+    '''
+    Given a list of CoT for each sample that leads to the correct final answer, calculate the probability of each CoT for each sample.
+    Todo: Here we start from the data with filtered CoTs. We can also start from the data with no CoTs, and we need to generate and filter the CoTs in this function.
+
+    Args:
+    data: the data with filtered CoTs
+    filename: the filename to save the results
+
+    Returns:
+    None
+    '''
     folder_path = f'../results/{dataset_name}_SR_bs'
     if not os.path.exists(folder_path):
         os.mkdir(folder_path)
@@ -196,6 +216,7 @@ def CoT_bootstrap(data, filename):
     with open(file_path, 'w') as json_file:
         json.dump(data_new, json_file)
 
+    return
 
 CoT_bootstrap(data_train, filename_train)
 CoT_bootstrap(data_val, filename_val)

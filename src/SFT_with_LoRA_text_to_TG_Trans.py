@@ -1,11 +1,6 @@
 import sys
 import json
-import random
 import os
-import re
-import argparse
-import numpy as np
-import copy
 
 
 
@@ -30,6 +25,17 @@ os.environ["WANDB_DISABLED"] = "true"
 
 
 def read_data(dataset_name, filename):
+    '''
+    Read the data from the json file and convert it into a dataset
+
+    Args:
+    - dataset_name: str, the name of the dataset
+    - filename: str, the name of the file
+
+    Returns:
+    - dataset: Dataset, the dataset
+    '''
+
     file_path = f'../dataset/{dataset_name}/{filename}'
     with open(file_path) as json_file:
         data = json.load(json_file)
@@ -49,15 +55,24 @@ def read_data(dataset_name, filename):
 
 
 def add_brackets(ls):
+    '''
+    Add brackets to the elements in the list
+    
+    Args:
+    - ls: list, the list of elements
+
+    Returns:
+    - ls: list, the list of elements with brackets
+    '''
     if '(' not in ls[0] and ')' not in ls[0]:
         ls = [f'( {e} )' for e in ls]
     return ls
 
 
 
-dataset_selection = 0
-f_train = 1
-f_test = 1
+dataset_selection = 0   # 0: TGQA, 1: TimeQA, 2: TempReason
+f_train = 1 # whether train the model
+f_test = 1 # whether test the model
 f_ICL = 1  # whether use in-context learning during test
 f_rewrite = 1 # whether rewrite existing test results
 f_shorten_story = 1 # whether shorten the story
@@ -84,6 +99,22 @@ print(data_test)
 
 
 def my_generate_prompt(story, TG, entities, relation, times, mode=None, eos_token="</s>"):
+    '''
+    Generate the prompt for text to TG translation (given context and keywords, generate the relevant TG)
+
+    Args:
+    - story: str or list, the story
+    - TG: str or list, the TG
+    - entities: str or list, the entities
+    - relation: str, the relation
+    - times: str or list, the times
+    - mode: train or test
+    - eos_token: str, the end of sentence token
+
+    Returns:
+    - prompt: str, the prompt
+    '''
+
     if isinstance(story, list):
         story = '\n'.join(story)
     if isinstance(times, list):
@@ -92,7 +123,7 @@ def my_generate_prompt(story, TG, entities, relation, times, mode=None, eos_toke
         entities = ' , '.join(add_brackets(entities))
 
     if f_shorten_story:
-        story = ' '.join(story.split(' ')[:2000])
+        story = ' '.join(story.split(' ')[:2000])  # simply shorten the story to 2000 words
 
     if f_ICL and mode == 'test':
         file_path = f'../materials/{dataset_name}/prompt_examples_text_to_TG_Trans.txt'
@@ -135,7 +166,7 @@ for i in range(5):
 
 
 
-model_name = "meta-llama/Llama-2-13b-hf"
+model_name = "meta-llama/Llama-2-13b-hf"  # can be changed to other models
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 
@@ -151,6 +182,7 @@ model = AutoModelForCausalLM.from_pretrained(model_name,
 
 
 if f_train:
+    # lora config
     lora_config = LoraConfig(
         r=8,
         lora_alpha=8,
@@ -204,6 +236,9 @@ if f_train:
 
 
     def formatting_func(sample):
+        '''
+        Given a sample, generate the prompt for the model
+        '''
         output = []
         for s, g, e, r, t in zip(sample['story'], sample['TG'], sample['entities'], sample['relation'], sample['times']):
             op = my_generate_prompt(s, g, e, r, t, mode='train')
@@ -211,7 +246,7 @@ if f_train:
 
         return output
 
-
+    # SFT with lora
     trainer = SFTTrainer(
         model=model,
         train_dataset=data_train,
@@ -235,6 +270,19 @@ if f_train:
 
 if f_test:
     def one_batch(tokenizer, input_prompts, samples, file_paths, max_new_tokens=512):
+        '''
+        Given the promot, generate the output and save the results
+
+        Args:
+        - tokenizer: the tokenizer
+        - input_prompts: list, the list of prompts
+        - samples: list, the list of samples
+        - file_paths: list, the list of file paths
+        - max_new_tokens: int, the maximum number of tokens to generate
+
+        Returns:
+        - None
+        '''
         input_tokens = tokenizer(input_prompts, padding='longest', return_tensors="pt")["input_ids"].to("cuda")
 
         with torch.cuda.amp.autocast():
@@ -263,7 +311,7 @@ if f_test:
         return
 
 
-
+    # we need padding on the left side to create the embeddings for a whole batch
     tokenizer.pad_token_id = 0
     tokenizer.padding_side = 'left'
 
@@ -279,6 +327,7 @@ if f_test:
     file_paths = []
     samples = []
     for i in range(len(data_test)):
+        # collect the prompts for 4 samples as a batch
         file_path = folder_path + f'/{str(i)}.json'
         if (os.path.exists(file_path)) and (not f_rewrite):
             continue
