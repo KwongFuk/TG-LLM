@@ -65,8 +65,8 @@ def my_generate_prompt(TG, EK, Q):
     Generate the prompt for the model
     
     Args:
-    TG: list of strings, each string is a time graph
-    EK: list of strings, each string is useful information
+    TG: list of strings, temporal graph
+    EK: list of strings, external knowledge
     Q: string, the question
     
     Returns:

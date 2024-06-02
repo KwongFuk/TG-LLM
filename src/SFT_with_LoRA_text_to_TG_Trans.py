@@ -7,7 +7,6 @@ import os
 import torch
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from datasets import load_dataset
 from peft import (
         get_peft_model, 
         prepare_model_for_kbit_training, 
