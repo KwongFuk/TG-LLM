@@ -2,8 +2,6 @@ import sys
 import json
 import os
 import numpy as np
-import copy
-
 
 
 import torch
@@ -42,7 +40,7 @@ def read_data(dataset_name, filename):
 
 
 
-dataset_selection = 0 # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
+dataset_selection = 0  # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
 dataset_name = ['TGQA', 'TimeQA_easy', 'TimeQA_hard', 'TempReason_l2', 'TempReason_l3'][dataset_selection]
 
 
@@ -134,14 +132,14 @@ def one_batch(input_prompts, samples):
     Returns:
     samples: the samples with the CoT sample probability, dict
     '''
-    gamma = 0.5
+    gamma = 0.5  # score = logProbs_pos + gamma*(logProbs_pos - logProbs_neg)
     for j in range(len(input_prompts)):
         context_len = tokenizer(input_prompts[j], return_tensors="pt")["input_ids"].shape[1]
         cur_sample = samples[j]
         scores = []
         for CoT in cur_sample['CoT']:
             cur_prompt = input_prompts[j] + process_CoT(CoT)
-            Probs_neg = []
+            logProb_neg = []
             for cand in cur_sample['candidates']:
                 input_tokens = tokenizer(cur_prompt + cand, return_tensors="pt")["input_ids"].to("cuda")
                 target_ids = input_tokens.clone()
@@ -149,21 +147,20 @@ def one_batch(input_prompts, samples):
                 with torch.no_grad():
                     outputs = model(input_tokens, labels=target_ids)
                     loss = outputs.loss.cpu().numpy()
-                    Probs_neg.append(loss)
-            # print(Probs_neg)
-            Probs_neg = np.mean(Probs_neg)
+                    logProb_neg.append(loss)
+         
+            logProb_neg = np.mean(logProb_neg)
 
 
             input_tokens = tokenizer(cur_prompt + cur_sample['answer'], return_tensors="pt")["input_ids"].to("cuda")
             target_ids = input_tokens.clone()
-            target_ids[:, :context_len] = -100
+            target_ids[:, :context_len] = -100  # mask the context before the answer
             with torch.no_grad():
                 outputs = model(input_tokens, labels=target_ids)
                 loss = outputs.loss.cpu().numpy()
-                Probs_pos = copy.copy(loss)
-                # print(Probs_pos)
-
-            scores.append(Probs_pos + gamma*(Probs_pos - Probs_neg))
+                logProbs_pos = loss
+            
+            scores.append(logProbs_pos + gamma*(logProbs_pos - logProb_neg))
 
         scores = [np.exp(-10*s) for s in scores]
         cur_sample['CoT_sample_prob'] = (scores/np.sum(scores)).tolist()
@@ -190,6 +187,8 @@ def CoT_bootstrap(data, filename):
     if not os.path.exists(folder_path):
         os.mkdir(folder_path)
 
+    batch_size = 4
+
     data_new = []
     input_prompts = []
     input_samples = []
@@ -200,13 +199,14 @@ def CoT_bootstrap(data, filename):
         input_prompts.append(cur_prompt)
         input_samples.append(sample)
 
-        if len(input_prompts) >= 4:
+        if len(input_prompts) >= batch_size:
             samples = one_batch(input_prompts, input_samples)
             data_new += samples
             input_prompts = []
             input_samples = []
 
 
+    # Last batch that is less than batch_size
     if len(input_prompts) > 0:
         samples = one_batch(input_prompts, input_samples)
         data_new += samples
@@ -218,5 +218,5 @@ def CoT_bootstrap(data, filename):
 
     return
 
+
 CoT_bootstrap(data_train, filename_train)
-CoT_bootstrap(data_val, filename_val)

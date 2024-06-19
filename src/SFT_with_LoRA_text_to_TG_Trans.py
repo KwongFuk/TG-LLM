@@ -75,7 +75,7 @@ f_test = 1 # whether test the model
 f_ICL = 1  # whether use in-context learning during test
 f_rewrite = 1 # whether rewrite existing test results
 f_shorten_story = 1 # whether shorten the story
-
+f_hard_mode = 1  # whether use hard mode for translation (only know relations) v.s. easy mode (know entities, relations and times)
 
 dataset_name = ['TGQA', 'TimeQA', 'TempReason'][dataset_selection]
 
@@ -114,6 +114,19 @@ def my_generate_prompt(story, TG, entities, relation, times, mode=None, eos_toke
     - prompt: str, the prompt
     '''
 
+    def add_examples_in_prompt(prompt, relation=None):
+        if f_ICL and mode == 'test':
+            file_path = f'../materials/{dataset_name}/prompt_examples_text_to_TG_Trans.txt' if (not f_hard_mode) or (relation is None) else \
+                        f'../materials/{dataset_name}/prompt_examples_text_to_TG_Trans_hard.txt'
+            with open(file_path) as txt_file:
+                prompt_examples = txt_file.read()
+
+            prompt = f"{prompt[0]}\n\n{prompt_examples}\n\nTest:\n\n{prompt[1]}"
+        else:
+            prompt = f"{prompt[0]}\n\n{prompt[1]}"
+        return prompt.strip()
+
+
     if isinstance(story, list):
         story = '\n'.join(story)
     if isinstance(times, list):
@@ -124,22 +137,16 @@ def my_generate_prompt(story, TG, entities, relation, times, mode=None, eos_toke
     if f_shorten_story:
         story = ' '.join(story.split(' ')[:2000])  # simply shorten the story to 2000 words
 
-    if f_ICL and mode == 'test':
-        file_path = f'../materials/{dataset_name}/prompt_examples_text_to_TG_Trans.txt'
-        with open(file_path) as txt_file:
-            prompt_examples = txt_file.read()
-
     if entities is None or relation is None or times is None:
-        if f_ICL and mode == 'test':
-            prompt = f"Extract the timeline based on the story.\n\n{prompt_examples}\n\nTest:\n\n{story}\n\nTimeline:"
-        else:
-            prompt = f"Extract the timeline based on the story.\n\n{story}\n\nTimeline:"
+        # If we do not have such information extracted from the questions, we will translate the whole story.
+        prompt = add_examples_in_prompt(["Extract the timeline based on the story.", f"{story}\n\nTimeline:"], relation)
     else:
-        if f_ICL and mode == 'test':
-            prompt = f"{prompt_examples}\n\nTest:\n\n{story}\n\nGiven the time periods: {times}, summary {relation} as a timeline. Choose from {entities}.\n\nTimeline:"
+        if f_hard_mode:
+            prompt = add_examples_in_prompt(["", f"{story}\n\nSummary {relation} as a timeline.\n\nTimeline:"], relation)
         else:
-            prompt = f"{story}\n\nGiven the time periods: {times}, summary {relation} as a timeline. Choose from {entities}.\n\nTimeline:"
+            prompt = add_examples_in_prompt(["", f"{story}\n\nGiven the time periods: {times}, summary {relation} as a timeline. Choose from {entities}.\n\nTimeline:"], relation)
 
+    # For training data, we provide the TG as label.
     if TG is not None:
         if isinstance(TG, list):
             TG = '\n'.join(TG)
@@ -321,6 +328,7 @@ if f_test:
     if not os.path.exists(folder_path):
         os.mkdir(folder_path)
 
+    batch_size = 4
 
     input_prompts = []
     file_paths = []
@@ -339,12 +347,12 @@ if f_test:
         samples.append(sample)
         file_paths.append(file_path)
 
-        if len(input_prompts) >= 4:
+        if len(input_prompts) >= batch_size:
             one_batch(tokenizer, input_prompts, samples, file_paths, max_new_tokens=1024)
             input_prompts = []
             file_paths = []
             samples_info = []
 
-
+    # Last batch that is less than batch_size
     if len(input_prompts) > 0:
         one_batch(tokenizer, input_prompts, samples, file_paths, max_new_tokens=1024)
