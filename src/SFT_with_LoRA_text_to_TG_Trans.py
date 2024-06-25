@@ -21,8 +21,6 @@ os.environ["WANDB_DISABLED"] = "true"
 
 
 
-
-
 def read_data(dataset_name, filename):
     '''
     Read the data from the json file and convert it into a dataset
@@ -53,29 +51,22 @@ def read_data(dataset_name, filename):
     return dataset
 
 
-def add_brackets(ls):
-    '''
-    Add brackets to the elements in the list
-    
-    Args:
-    - ls: list, the list of elements
 
-    Returns:
-    - ls: list, the list of elements with brackets
-    '''
-    if '(' not in ls[0] and ')' not in ls[0]:
-        ls = [f'( {e} )' for e in ls]
-    return ls
 
 
 
 dataset_selection = 0   # 0: TGQA, 1: TimeQA, 2: TempReason
-f_train = 1 # whether train the model
-f_test = 1 # whether test the model
-f_ICL = 1  # whether use in-context learning during test
-f_rewrite = 1 # whether rewrite existing test results
-f_shorten_story = 1 # whether shorten the story
-f_hard_mode = 1  # whether use hard mode for translation (only know relations) v.s. easy mode (know entities, relations and times)
+f_train = 1  # whether train the model
+f_test = 1  # whether test the model
+f_ICL = 1   # whether use in-context learning during test
+f_rewrite = 1  # whether rewrite existing test results
+f_shorten_story = 1  # whether shorten the story
+f_hard_mode = 1   # whether use hard mode for translation (only know relations) v.s. easy mode (know entities, relations and times)
+
+# If we want to test the transfer learning performance, just change the transferred dataset name.
+# Note: current dataset_name should be 'TGQA', transferred_dataset_name = None (no transfer learning)
+transferred_dataset_name = [None, 'TimeQA', 'TempReason'][0]  
+
 
 dataset_name = ['TGQA', 'TimeQA', 'TempReason'][dataset_selection]
 
@@ -97,6 +88,78 @@ print(data_test)
 
 
 
+def add_brackets(ls):
+    '''
+    Add brackets to the elements in the list
+    
+    Args:
+    - ls: list, the list of elements
+
+    Returns:
+    - ls: list, the list of elements with brackets
+    '''
+    if '(' not in ls[0] and ')' not in ls[0]:
+        ls = [f'( {e} )' for e in ls]
+    return ls
+
+
+def TG_formating_change(TG, targ_dataset):
+    '''
+    To test transfer learning performance, change the format of the TG from TGQA to other datasets.
+
+    Args:
+    - TG: str, the TG
+    - targ_dataset: str, the target dataset
+
+    Returns:
+    - TG: str, the TG with the new format
+    '''
+    assert (targ_dataset is None) or (targ_dataset in ['TimeQA', 'TempReason'] and dataset_name == 'TGQA') 
+    
+    if targ_dataset is None:
+        return TG
+
+    event_pos = {}
+    timeline = []
+    eventline = []
+    cnt = 0
+    for line in TG.split('\n'):
+        if not len(line.strip()):
+            continue
+        if 'starts at' in line:
+            event = line.split('starts at')[0].strip()
+            time = line.split('starts at')[1].strip()
+            event_pos[event] = cnt
+            eventline.append(event)
+            timeline.append(time)
+            cnt += 1
+        else:
+            event = line.split('ends at')[0].strip()
+            time = line.split('ends at')[1].strip()
+            if event in event_pos:
+                timeline[event_pos[event]] = timeline[event_pos[event]] + ' - ' + time
+            else:
+                event_pos[event] = cnt
+                eventline.append(event)
+                timeline.append(time)
+                cnt += 1
+
+    TG = []
+    for event, time in zip(eventline, timeline):
+        if '-' not in time:
+            time = time + ' - ' + time
+        if targ_dataset == 'TempReason':
+            time = 'from ' + time.replace(' - ', ' to ')
+
+        if targ_dataset == 'TimeQA':
+            TG.append(f'{time} : {event}')
+        else:
+            TG.append(f'{event[1:-1]} {time}.')
+    TG = '\n'.join(TG)
+    
+    return TG
+
+
 def my_generate_prompt(story, TG, entities, relation, times, mode=None, eos_token="</s>"):
     '''
     Generate the prompt for text to TG translation (given context and keywords, generate the relevant TG)
@@ -114,9 +177,9 @@ def my_generate_prompt(story, TG, entities, relation, times, mode=None, eos_toke
     - prompt: str, the prompt
     '''
 
-    def add_examples_in_prompt(prompt, relation=None):
+    def add_examples_in_prompt(prompt):
         if f_ICL and mode == 'test':
-            file_path = f'../materials/{dataset_name}/prompt_examples_text_to_TG_Trans.txt' if (not f_hard_mode) or (relation is None) else \
+            file_path = f'../materials/{dataset_name}/prompt_examples_text_to_TG_Trans.txt' if (not f_hard_mode) else \
                         f'../materials/{dataset_name}/prompt_examples_text_to_TG_Trans_hard.txt'
             with open(file_path) as txt_file:
                 prompt_examples = txt_file.read()
@@ -137,19 +200,23 @@ def my_generate_prompt(story, TG, entities, relation, times, mode=None, eos_toke
     if f_shorten_story:
         story = ' '.join(story.split(' ')[:2000])  # simply shorten the story to 2000 words
 
-    if entities is None or relation is None or times is None:
+    if relation is None:
         # If we do not have such information extracted from the questions, we will translate the whole story.
-        prompt = add_examples_in_prompt(["Extract the timeline based on the story.", f"{story}\n\nTimeline:"], relation)
+        prompt = add_examples_in_prompt(["", f"{story}\n\nSummary all the events as a timeline.\n\nTimeline:"])
     else:
-        if f_hard_mode:
-            prompt = add_examples_in_prompt(["", f"{story}\n\nSummary {relation} as a timeline.\n\nTimeline:"], relation)
+        if f_hard_mode or entities is None or times is None:
+            prompt = add_examples_in_prompt(["", f"{story}\n\nSummary {relation} as a timeline.\n\nTimeline:"])
         else:
-            prompt = add_examples_in_prompt(["", f"{story}\n\nGiven the time periods: {times}, summary {relation} as a timeline. Choose from {entities}.\n\nTimeline:"], relation)
+            prompt = add_examples_in_prompt(["", f"{story}\n\nGiven the time periods: {times}, summary {relation} as a timeline. Choose from {entities}.\n\nTimeline:"])
 
     # For training data, we provide the TG as label.
     if TG is not None:
         if isinstance(TG, list):
             TG = '\n'.join(TG)
+
+        # If we want to test the transfer learning performance, we can change the format of the TG in TGQA to other datasets.
+        TG = TG_formating_change(TG, transferred_dataset_name)
+
         prompt += f"\n{TG}\n"
 
     prompt += eos_token
