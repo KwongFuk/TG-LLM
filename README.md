@@ -4,6 +4,8 @@ This repository contains the code for the paper [Large Language Models Can Learn
 
 Our framework (TG-LLM) performs temporal reasoning in two steps: 1) Text-to-Temporal Graph translation: generate (relevant) temporal graph given the context and keyword (extracted from questions); 2) Temporal Graph Reasoning: perform Chain-of-Thought reasoning over the temporal graph.
 
+<br>
+
 <p align="center">
   <img src='https://raw.githubusercontent.com/xiongsiheng/TG-LLM/main/misc/Framework.png' width=550>
 </p>
