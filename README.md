@@ -21,15 +21,15 @@ The structure of the file folder should be like
 ```sh
 TG-LLM/
 │
-├── src/
-│
 ├── dataset/
-│
-├── model_weights/
 │
 ├── materials/
 │
-└── results/
+├── model_weights/
+│
+├── results/
+│
+└── src/
 ```
 
 Preparation
