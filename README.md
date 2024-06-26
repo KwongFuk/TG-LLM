@@ -4,8 +4,10 @@ This repository contains the code for the paper [Large Language Models Can Learn
 
 Our framework (TG-LLM) performs temporal reasoning in two steps: 1) Text-to-Temporal Graph translation: generate (relevant) temporal graph given the context and keyword (extracted from questions); 2) Temporal Graph Reasoning: perform Chain-of-Thought reasoning over the temporal graph.
 
+<br>
+
 <p align="center">
-  <img src='https://raw.githubusercontent.com/xiongsiheng/TG-LLM/main/misc/Framework.png' width=450>
+  <img src='https://raw.githubusercontent.com/xiongsiheng/TG-LLM/main/misc/Framework.png' width=550>
 </p>
 
 
@@ -53,12 +55,12 @@ cd src
 # step 1: text-to-temporal graph translation
 python SFT_with_LoRA_text_to_TG_Trans.py
 
-# step 2: neuro-symbolic reasoning
+# step 2: temporal graph reasoning
 python CoT_bootstrap.py
-python SFT_with_LoRA_Symbolic_Reasoning.py
+python SFT_with_LoRA_TG_Reasoning.py
 
 # to obtain results based on perplexity
-python SFT_with_LoRA_Symbolic_Reasoning_ppl.py
+python SFT_with_LoRA_TG_Reasoning_ppl.py
 ```
 
 For other leading LLMs (GPT series/Llama2 family)
