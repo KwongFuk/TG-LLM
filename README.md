@@ -36,15 +36,16 @@ Preparation
 ```sh
 # git clone this repo
 
+# create a new environment with anaconda and install the necessary Python packages
+
 cd TG-LLM
+mkdir dataset
 mkdir model_weights
 mkdir results
-mkdir dataset
 
 cd dataset
 # download the datasets from the link below
 
-# create a new environment with anaconda and install the necessary Python packages
 ```
 
 For our TG-LLM framework
