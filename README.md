@@ -21,8 +21,6 @@ The structure of the file folder should be like
 ```sh
 TG-LLM/
 │
-├── dataset/
-│
 ├── materials/
 │
 ├── model_weights/
@@ -38,14 +36,12 @@ Preparation
 
 # create a new environment with anaconda and install the necessary Python packages
 
+# install hugging face packages to load Llama2 models and datasets
+
+# create the folders
 cd TG-LLM
-mkdir dataset
 mkdir model_weights
 mkdir results
-
-cd dataset
-# download the datasets from the link below
-
 ```
 
 For our TG-LLM framework
