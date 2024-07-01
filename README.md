@@ -84,9 +84,9 @@ To download the dataset, install [Huggingface Datasets](https://huggingface.co/d
 
 ```python
 from datasets import load_dataset
-dataset = load_dataset("sxiong/TGQA", "TGQA") # three configs available: "TGQA", "TempReason", "TimeQA"
+dataset = load_dataset("sxiong/TGQA", "TGQA_Story_TG_Trans") # Six configs available: "TGQA_Story_TG_Trans", "TGQA_TGR", "TempReason_Story_TG_Trans", "TempReason_TGR", "TimeQA_Story_TG_Trans", "TimeQA_TGR"
 print(dataset) # Print dataset to see the statistics and available splits
-split = dataset['Story_TG_Trans_train']  # multiple splits available, e.g., "Story_TG_Trans_train", "TGR_train", ...
+split = dataset['train']  # Multiple splits available: "train", "val", "test"
 ```
 
 ## Contact
