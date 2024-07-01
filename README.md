@@ -85,8 +85,8 @@ To download the dataset, install [Huggingface Datasets](https://huggingface.co/d
 ```python
 from datasets import load_dataset
 dataset = load_dataset("sxiong/TGQA", "TGQA")
-dataset = load_dataset("sxiong/TGQA", "TempReason")
 dataset = load_dataset("sxiong/TGQA", "TimeQA")
+dataset = load_dataset("sxiong/TGQA", "TempReason")
 ```
 
 ## Contact
