@@ -84,6 +84,15 @@ python Evaluation.py
 
 All the datasets (TGQA, TimeQA, TempReason) can be found [here](https://huggingface.co/datasets/sxiong/TGQA).
 
+To download the dataset, install [Huggingface Datasets](https://huggingface.co/docs/datasets/quickstart) and then use the following command:
+
+```python
+from datasets import load_dataset
+dataset = load_dataset("sxiong/TGQA", "TGQA")
+dataset = load_dataset("sxiong/TGQA", "TempReason")
+dataset = load_dataset("sxiong/TGQA", "TimeQA")
+```
+
 ## Contact
 If you have any inquiries, please feel free to raise an issue or reach out to sxiong45@gatech.edu.
 
