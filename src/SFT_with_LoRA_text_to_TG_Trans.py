@@ -26,7 +26,7 @@ os.environ["WANDB_DISABLED"] = "true"
 
 
 dataset_selection = 0   # 0: TGQA, 1: TimeQA, 2: TempReason
-f_train = 0  # whether train the model
+f_train = 1  # whether train the model
 f_test = 1  # whether test the model
 f_ICL = 1   # whether use in-context learning during test
 f_rewrite = 1  # whether rewrite existing test results
