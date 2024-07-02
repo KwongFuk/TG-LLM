@@ -21,9 +21,16 @@ os.environ["WANDB_DISABLED"] = "true"
 
 
 
-dataset_selection = 0  # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
-dataset_name = ['TGQA', 'TimeQA', 'TimeQA', 'TempReason', 'TempReason'][dataset_selection]
+######### Config #########
 
+dataset_selection = 0  # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
+f_print_example_prompt = True  # whether to print the example prompt for the model
+f_unit_test = False  # whether to run the unit test (only for debugging)
+
+###########################
+
+
+dataset_name = ['TGQA', 'TimeQA', 'TimeQA', 'TempReason', 'TempReason'][dataset_selection]
 
 dataset = load_dataset("sxiong/TGQA", f'{dataset_name}_TGR')
 
@@ -33,6 +40,10 @@ data_train = dataset[split_train]
 split_val = ['val', 'easy_val', 'hard_val', 'l2_val', 'l3_val'][dataset_selection]
 data_val = dataset[split_val]
 
+
+if f_unit_test:
+    data_train = create_subset(data_train, 10)
+    data_val = create_subset(data_val, 10)
 
 
 print(data_train)
@@ -69,12 +80,12 @@ def my_generate_prompt(TG, EK, Q):
 
 
 
-
-for i in range(5):
-    sample = data_train[i]
-    prompt = my_generate_prompt(sample['TG'], sample['external knowledge'], sample['question'])
-    print(prompt)
-    print('===============================')
+if f_print_example_prompt:
+    for i in range(5):
+        sample = data_train[i]
+        prompt = my_generate_prompt(sample['TG'], sample['external knowledge'], sample['question'])
+        print(prompt)
+        print('===============================')
 
 
 
@@ -120,8 +131,15 @@ def one_batch(input_prompts, samples):
         cur_prompts = []
         context_len = []
         for comb in combinations:
-            cur_prompts.append(input_prompts[j] + process_CoT(comb[0]) + comb[1])
-            context_len.append(tokenizer(input_prompts[j] + process_CoT(comb[0]), return_tensors="pt")["input_ids"].shape[1])
+            context = input_prompts[j] + process_CoT(comb[0])
+            cur_prompts.append(context + comb[1])
+            
+            len_bf = tokenizer(context, return_tensors="pt")["input_ids"].shape[1]
+            len_af = tokenizer(context + comb[1], return_tensors="pt")["input_ids"].shape[1]
+            
+            # The length of the context should be at least 1 less than the length of all the tokens
+            context_len.append(min(len_bf, len_af-1))
+        
 
         # Tokenize the entire batch of answers at once with truncation
         input_tokens = tokenizer(cur_prompts, return_tensors="pt", padding=True, truncation=True, max_length=2048)["input_ids"].to("cuda")        
@@ -134,6 +152,9 @@ def one_batch(input_prompts, samples):
         # Mask padding tokens
         padding_mask = input_tokens == tokenizer.pad_token_id
         target_ids[padding_mask] = -100  # mask the padding tokens
+
+        # # Verify target_ids
+        # print("Target IDs after padding mask:", target_ids)
 
         # Process the batch
         with torch.no_grad():
@@ -152,14 +173,23 @@ def one_batch(input_prompts, samples):
         # Mask loss for padding tokens
         loss[padding_mask[:, 1:]] = 0.0
 
+        # # Verify loss tensor
+        # print("Loss tensor:", loss)
+
         # Aggregate loss for each answer
-        loss_per_answer = loss.sum(dim=1) / (loss != 0).sum(dim=1)
+        valid_counts = (loss != 0).sum(dim=1)
+        valid_counts[valid_counts == 0] = 1  # Avoid division by zero
+        loss_per_answer = loss.sum(dim=1) / valid_counts
         loss_per_answer = loss_per_answer.cpu().numpy()
 
         # Split the losses back to individual CoTs
         loss_per_answer = loss_per_answer.reshape((len(cur_sample['CoT']), -1))
         logProbs_pos = np.mean(loss_per_answer[:, len(neg_ans):], axis=1)
         logProbs_neg = np.mean(loss_per_answer[:, :len(neg_ans)], axis=1)
+
+        # print("Loss per answer:", loss_per_answer)
+        # print("Log Probs Pos:", logProbs_pos)
+        # print("Log Probs Neg:", logProbs_neg)
 
         # Constrastive score:
         scores = logProbs_pos + gamma*(logProbs_pos - logProbs_neg)
@@ -184,7 +214,7 @@ def CoT_bootstrap(data, filename):
     Returns:
     None
     '''
-    folder_path = f'../results/{dataset_name}_TGR_bs'
+    folder_path = f'../results/{dataset_name}_TGR_CoT_bs'
     if not os.path.exists(folder_path):
         os.mkdir(folder_path)
 

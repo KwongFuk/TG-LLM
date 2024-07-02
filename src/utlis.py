@@ -2,6 +2,7 @@ import random
 import os
 import copy
 from datasets import load_dataset
+import sys
 
 
 
@@ -134,15 +135,15 @@ def data_augmentation(dataset_name, TG, EK, Q, CoT, C, A, flag_rm_irr_edges=Fals
     if flag_rm_irr_edges:
         TG = rm_irr_edges(TG, CoT, Q)
 
+    if flag_change_entities:
+        TG, EK, Q, CoT, C, A = change_entities(TG, [TG, EK, Q, CoT, C, A], rel_entity_dict, global_ent_mapping, global_names_cnt, random_entity_names)
+    
+    if flag_change_times:
+        TG, EK, Q, CoT, C, A = change_times(TG, [TG, EK, Q, CoT, C, A], global_time_offset)
+
     if flag_change_relations:
         TG = change_rels(dataset_name, TG)
 
-    if flag_change_entities:
-        TG, EK, Q, CoT, C, A = change_entities(TG, [TG, EK, Q, CoT, C, A], rel_entity_dict, global_ent_mapping, global_names_cnt, random_entity_names)
-
-    if flag_change_times:
-        TG, EK, Q, CoT, C, A = change_times(TG, [TG, EK, Q, CoT, C, A], global_time_offset)
-  
     return TG, EK, Q, CoT, C, A
 
 
@@ -322,35 +323,34 @@ def change_entities(TG, elements, rel_entity_dict, global_ent_mapping, global_na
             
             # deal with the subject
             sub = fact.split(rel)[0].strip()
-            if sub in global_ent_mapping:
-                continue
-            if 'sub_total' not in global_names_cnt:
-                global_names_cnt['sub_total'] = 0
-            global_ent_mapping[sub] = random_entity_names['sub_total'][global_names_cnt['sub_total']]
-            global_names_cnt['sub_total'] += 1
+            if sub not in global_ent_mapping:
+                if 'sub_total' not in global_names_cnt:
+                    global_names_cnt['sub_total'] = 0
+                global_ent_mapping[sub] = random_entity_names['sub_total'][global_names_cnt['sub_total']]
+                global_names_cnt['sub_total'] += 1
 
             # deal with the object
             obj = fact.split(rel)[1].strip()
-            if obj in global_ent_mapping:
-                continue
-            if rel in ['was married to']:
-                if 'sub_total' not in global_names_cnt:
-                    global_names_cnt['sub_total'] = 0
-                global_ent_mapping[obj] = random_entity_names['sub_total'][global_names_cnt['sub_total']]
-                global_names_cnt['sub_total'] += 1
-            else:
-                if rel not in global_names_cnt:
-                    global_names_cnt[rel] = 0
+            if obj not in global_ent_mapping:
+                if rel in ['was married to']:
+                    if 'sub_total' not in global_names_cnt:
+                        global_names_cnt['sub_total'] = 0
+                    global_ent_mapping[obj] = random_entity_names['sub_total'][global_names_cnt['sub_total']]
+                    global_names_cnt['sub_total'] += 1
+                else:
+                    if rel not in global_names_cnt:
+                        global_names_cnt[rel] = 0
 
-                valid_name = random_entity_names[rel]['obj'][global_names_cnt[rel]]
-                while valid_name in global_ent_mapping.values():
-                    global_names_cnt[rel] += 1
                     valid_name = random_entity_names[rel]['obj'][global_names_cnt[rel]]
+                    while valid_name in global_ent_mapping.values():
+                        global_names_cnt[rel] += 1
+                        valid_name = random_entity_names[rel]['obj'][global_names_cnt[rel]]
 
-                global_ent_mapping[obj] = copy.copy(valid_name)
+                    global_ent_mapping[obj] = copy.copy(valid_name)
 
             break
     
+ 
     def replace_entity(e, mapping_ent):
         for entity in mapping_ent:
             e = e.replace(entity, mapping_ent[entity])

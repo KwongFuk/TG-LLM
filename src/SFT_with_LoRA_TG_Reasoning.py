@@ -16,7 +16,8 @@ from peft import (
     )
 from trl import SFTTrainer
 from peft import PeftModel
-from datasets import Dataset
+from datasets import Dataset, load_dataset, concatenate_datasets
+from utlis import *
 
 
 os.environ["WANDB_DISABLED"] = "true"
@@ -24,328 +25,33 @@ os.environ["WANDB_DISABLED"] = "true"
 
 
 
+######### Config #########
 
-
-dataset_selection = 0 # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
-f_train = 1 # whether train the model
+dataset_selection = 0  # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
+f_train = 1  # whether train the model
 f_test = 1  # whether test the model
-f_CoT_bs = 1 # whether use CoT bootstrapping
-f_data_aug = 1 # whether use data augmentation
+f_CoT_bs = 1  # whether use CoT bootstrapping
+f_data_aug = 1  # whether use data augmentation
 f_ICL = 1  # whether use in-context learning during test
-f_rewrite = 1 # whether rewrite existing test results
+f_rewrite = 1  # whether rewrite existing test results
+f_print_example_prompt = True  # whether to print the example prompt for the model
+f_unit_test = False  # whether to run the unit test (only for debugging)
 
+###########################
 
-dataset_name = ['TGQA', 'TimeQA_easy', 'TimeQA_hard', 'TempReason_l2', 'TempReason_l3'][dataset_selection]
-Q_type = ['', 'easy', 'hard', 'l2', 'l3'][dataset_selection]
-dataset_name_short = dataset_name.split('_')[0]
 
+dataset_name = ['TGQA', 'TimeQA', 'TimeQA', 'TempReason', 'TempReason'][dataset_selection]
+split_name = ['', '_easy', '_hard', '_l2', '_l3'][dataset_selection]
 
 
-def data_augmentation(TG, EK, Q, CoT, C, A, flag_rm_irr_edges=False, flag_change_relations=False, flag_change_entities=False, flag_change_times=False):
-    '''
-    Augment the data by randomly deleting irrelevant edges and changing the entities, relations, and times.
 
-    args:
-        TG: list of strings or string, temporal graph
-        EK: list of strings or string, exteral knowledge
-        Q: string, question
-        CoT: list of strings, chain of thought
-        C: list of strings, candidates
-        A: string, answer
-        flag_rm_irr_edges: bool, whether to remove irrelevant edges
-        flag_change_relations: bool, whether to change relations
-        flag_change_entities: bool, whether to change entities
-        flag_change_times: bool, whether to change times
 
-    return:
-        TG: list of strings, augmented temporal graph
-        EK: list of strings, augmented exteral knowledge
-        Q: string, augmented question
-        CoT: list of strings, augmented chain of thought
-        C: list of strings, augmented candidates
-        A: string, augmented answer
-    '''
-    flag1, flag2 = 0, 0
-    if isinstance(TG, list):
-        TG = '\n'.join(TG)
-        flag1 = 1
 
-    if EK is not None:
-        if isinstance(EK, list):
-            EK = '\n'.join(EK)
-            flag2 = 1
 
-    if flag_rm_irr_edges:
-        TG = rm_irr_edges(TG, CoT, Q)
 
-    if flag_change_relations:
-        TG = change_rels(TG)
 
-    if flag_change_entities:
-        TG, EK, Q, CoT, C, A = change_entities(TG, [TG, EK, Q, CoT, C, A])
 
-    if flag_change_times:
-        TG, EK, Q, CoT, C, A = change_times(TG, [TG, EK, Q, CoT, C, A])
-
-    if flag1:
-        TG = TG.split('\n')
-    if flag2:
-        EK = EK.split('\n')
-
-    return TG, EK, Q, CoT, C, A
-
-
-
-
-def rm_irr_edges(TG, CoT, Q):
-    '''
-    Remove irrelevant edges in the temporal graph.
-    '''
-    facts_ls = TG.split('\n')
-    rm_facts = [i for (i, fact) in enumerate(facts_ls) if (fact[:-len(fact.split(')')[-1])].strip() not in CoT) and (fact[:-len(fact.split(')')[-1])].strip() not in Q)]
-    random.shuffle(rm_facts)
-    rm_facts = rm_facts[:int(0.2*len(rm_facts))]
-    facts_ls = [fact for (i, fact) in enumerate(facts_ls) if i not in rm_facts]
-    TG = '\n'.join(facts_ls)
-    return TG
-
-
-
-
-def change_rels(TG):
-    '''
-    Change relations in the temporal graph.
-    '''
-    with open(f'../materials/{dataset_name_short}/rel_synonyms.txt', 'r') as file:
-        contents = file.readlines()
-
-    rel_synonyms = {}
-    for line in contents:
-        if len(line.strip()) > 0:
-            rel = line.split('\t')[0].strip()
-            rel_synonyms[rel] = line.split('\t')
-
-
-    facts_ls = TG.split('\n')
-    facts_new_ls = []
-    for fact in facts_ls:
-        fact_front = fact[:-len(fact.split(')')[-1])].strip()[1:-1]
-        fact_back = fact[-len(fact.split(')')[-1]):]
-        for rel in rel_synonyms:
-            if ' ' + rel in fact_front:
-                sub = fact_front.split(rel)[0].strip()
-                obj = fact_front.split(rel)[1].strip()
-                fact_new = f'({sub} {random.choice(rel_synonyms[rel]).strip()} {obj}){fact_back}'
-                facts_new_ls.append(fact_new)
-                break
-
-    TG = '\n'.join(facts_new_ls)
-    return TG
-
-
-
-def change_times(TG, prompts):
-    '''
-    Change times in the temporal graph.
-    '''
-    facts_ls = TG.split('\n')
-    mapping_time = {}
-
-    for fact in facts_ls:
-        time = fact.split(' at ')[-1]
-        mapping_time[time] = str(int(time) + global_time_offset)
-        mapping_time[time] = mapping_time[time][0] + '_' + mapping_time[time][1:]
-
-    prompts_new = []
-    for prompt in prompts:
-        if isinstance(prompt, list):
-            prompt_new = []
-            for sub_prompt in prompt:
-                for time in mapping_time:
-                    sub_prompt = sub_prompt.replace(time, mapping_time[time])
-                sub_prompt = sub_prompt.replace('_', '')
-                prompt_new.append(sub_prompt)
-            prompt = copy.copy(prompt_new)
-        else:
-            for time in mapping_time:
-                prompt = prompt.replace(time, mapping_time[time])
-            prompt = prompt.replace('_', '')
-        prompts_new.append(prompt)
-    return prompts_new
-
-
-
-def collect_entity():
-    '''
-    Collect subject and object entities for each relation.
-
-    return:
-        rel_entity_dict: dict, subject and object entities for each relation
-    '''
-    with open(f'../materials/{dataset_name_short}/rel_dict.txt', 'r') as file:
-        contents = file.readlines()
-
-    rel_entity_dict = {}
-    for line in contents:
-        if len(line.strip()) > 0:
-            rel = line.split('\t')[0].strip()
-            rel_entity_dict[rel] = {'sub': [], 'obj': []}
-
-    def process_ent(rel_entity_dict, data):
-        for i in range(len(data)):
-            sample = data[i]
-            facts_ls = sample['TG'].split('\n')
-            for fact in facts_ls:
-                fact = fact[:-len(fact.split(')')[-1])].strip()[1:-1]
-                for rel in rel_entity_dict:
-                    if ' ' + rel in fact:
-                        rel_entity_dict[rel]['sub'].append(fact.split(rel)[0].strip())
-                        rel_entity_dict[rel]['obj'].append(fact.split(rel)[1].strip())
-                        break
-        return rel_entity_dict
-
-
-
-    filename = ['TGSR_train.json', 'TGSR_easy_train.json', 'TGSR_hard_train.json', 'TGSR_l2_train.json', 'TGSR_l3_train.json'][dataset_selection]
-    data_train = read_data(dataset_name, filename)
-
-    filename = ['TGSR_val.json', 'TGSR_easy_val.json', 'TGSR_hard_val.json', 'TGSR_l2_val.json', 'TGSR_l3_val.json'][dataset_selection]
-    data_val = read_data(dataset_name, filename)
-
-    filename = ['TGSR_test.json', 'TGSR_easy_test.json', 'TGSR_hard_test.json', 'TGSR_l2_test.json', 'TGSR_l3_test.json'][dataset_selection]
-    data_test = read_data(dataset_name, filename)
-
-
-
-    rel_entity_dict = process_ent(rel_entity_dict, data_train)
-    rel_entity_dict = process_ent(rel_entity_dict, data_val)
-    rel_entity_dict = process_ent(rel_entity_dict, data_test)
-
-    for rel in rel_entity_dict:
-        rel_entity_dict[rel]['sub'] = list(set(rel_entity_dict[rel]['sub']))
-        rel_entity_dict[rel]['obj'] = list(set(rel_entity_dict[rel]['obj']))
-
-    sub_total = []
-    for rel in rel_entity_dict:
-        sub_total += rel_entity_dict[rel]['sub']
-    sub_total = list(set(sub_total))
-    rel_entity_dict['sub_total'] = sub_total
-
-    return rel_entity_dict
-
-
-
-def collect_entity_v2(existing_names=None):
-    '''
-    Collect random subject and object entity names for each relation.
-
-    args:
-        existing_names: dict, existing entity names (which we want to exclude)
-
-    return:
-        ent_names: dict, random entity names
-    '''
-    path = f'../materials/{dataset_name_short}/random_names'
-    with open(f'{path}/sub_total.txt') as file:
-        context = file.readlines()
-
-    sub_total = [line.strip() for line in context]
-    sub_total = list(set(sub_total))
-
-    ent_names = {}
-    for file_path in os.listdir(path):
-        if file_path != 'sub_total.txt':
-            with open(f'{path}/{file_path}') as file:
-                context = file.read()
-            rel = file_path.split('.')[0]
-            ent_names[rel] = {}
-            ent_names[rel]['obj'] = context.strip().split('\n')
-            ent_names[rel]['obj'] = list(set(ent_names[rel]['obj']))
-
-
-    if existing_names is not None:
-        sub_total = [name for name in sub_total if name not in existing_names['sub_total']]
-        random.shuffle(sub_total)
-        for rel in ent_names:
-            ent_names[rel]['obj'] = [name for name in ent_names[rel]['obj'] if name not in existing_names[rel]['obj']]
-            random.shuffle(ent_names[rel]['obj'])
-        ent_names['sub_total'] = sub_total
-
-    return ent_names
-
-
-
-def change_entities(TG, prompts):
-    '''
-    Change entities in the temporal graph.
-    
-    args:
-        TG: list of strings, temporal graph
-        prompts: list of strings or list of list of strings, prompts
-
-    return:
-        prompts_new: list of strings or list of list of strings, augmented prompts
-    '''
-    facts_ls = TG.split('\n')
-    for fact in facts_ls:
-        fact = fact[:-len(fact.split(')')[-1])].strip()[1:-1]
-        for rel in rel_entity_dict:
-            if ' ' + rel in fact:
-                sub = fact.split(rel)[0].strip()
-                obj = fact.split(rel)[1].strip()
-                if sub not in global_ent_mapping:
-                    if 'sub_total' not in global_names_cnt:
-                        global_names_cnt['sub_total'] = 0
-                    global_ent_mapping[sub] = random_entity_names['sub_total'][global_names_cnt['sub_total']]
-                    global_names_cnt['sub_total'] += 1
-
-                if obj not in global_ent_mapping:
-                    if rel in ['was married to']:
-                        # mapping[obj] = create_new_person()
-                        if 'sub_total' not in global_names_cnt:
-                            global_names_cnt['sub_total'] = 0
-                        global_ent_mapping[obj] = random_entity_names['sub_total'][global_names_cnt['sub_total']]
-                        global_names_cnt['sub_total'] += 1
-
-                    else:
-                        if rel not in global_names_cnt:
-                            global_names_cnt[rel] = 0
-
-                        valid_name = random_entity_names[rel]['obj'][global_names_cnt[rel]]
-                        while valid_name in global_ent_mapping.values():
-                            global_names_cnt[rel] += 1
-                            valid_name = random_entity_names[rel]['obj'][global_names_cnt[rel]]
-
-                        global_ent_mapping[obj] = copy.copy(valid_name)
-                break
-
-    prompts_new = []
-    for prompt in prompts:
-        if isinstance(prompt, list):
-            prompt_new = []
-            for sub_prompt in prompt:
-                for entity in global_ent_mapping:
-                    sub_prompt = sub_prompt.replace(entity, global_ent_mapping[entity])
-                prompt_new.append(sub_prompt)
-            prompt = copy.copy(prompt_new)
-        else:
-            for entity in global_ent_mapping:
-                prompt = prompt.replace(entity, global_ent_mapping[entity])
-        prompts_new.append(prompt)
-    return prompts_new
-
-
-
-def CoT_sampling(CoT, CoT_sample_prob):
-    '''
-    Sample a chain of thought according to the given probabilities.
-    '''
-    return random.choices(CoT, weights=CoT_sample_prob, k=1)
-
-
-
-
-def read_data(dataset_name, filename, f_CoT_bs=0, f_data_aug=0):
+def read_data(dataset_name, prefix, split, f_CoT_bs=0, f_data_aug=0):
     '''
     Read the data from the given file.
 
@@ -358,50 +64,60 @@ def read_data(dataset_name, filename, f_CoT_bs=0, f_data_aug=0):
     return:
         dataset: Dataset, the dataset
     '''
-    if f_CoT_bs:
-        file_path = f'../results/{dataset_name}_SR_bs/{filename}'
+    file_path = f'../results/{dataset_name}_TGR_CoT_bs/{prefix + split}.json'
+    if (not f_CoT_bs) or (not os.path.exists(file_path)):
+        dataset = load_dataset("sxiong/TGQA", f'{dataset_name}_TGR')
+        dataset = dataset[prefix + split]
     else:
-        file_path = f'../dataset/{dataset_name_short}/{filename}'
+        with open(file_path) as json_file:
+            data = json.load(json_file)
 
-    with open(file_path) as json_file:
-        data = json.load(json_file)
+        # Convert list of dictionaries to the desired format
+        data_dict = {'story': [item["story"] for item in data],
+                     'TG': [item["TG"] for item in data],
+                     'question': [item["question"] for item in data], 
+                     'answer': [item["answer"] for item in data],
+                     'external knowledge': [item["external knowledge"] for item in data],
+                     'CoT': [CoT_sampling(item["CoT"], item['CoT_sample_prob']) for item in data],
+                     'candidates': [item["candidates"] for item in data],
+                     'id': [item['id'] for item in data],
+                     'Q-Type': [item['Q-Type'] for item in data]}
+
+        # Convert your data into a dataset
+        dataset = Dataset.from_dict(data_dict)
+
+
 
     if f_data_aug and dataset_name in ['TGQA']:
-        data_aug = []
-        for sample in data:
-            TG, EK, Q, CoT, C, A = data_augmentation(sample['TG'], sample['EK'], sample['question'], sample['CoT'], sample['candidates'], sample['answer'], 
-                                                      flag_rm_irr_edges=True, flag_change_relations=True, 
-                                                      flag_change_entities=True, flag_change_times=True)
-            data_aug.append({'story': sample['story'], 'TG': TG, 'EK': EK, 'question': Q, 'CoT': CoT, 'candidates': C, 'answer': A, 'id': sample['id'], 
-                             'CoT_sample_prob': sample['CoT_sample_prob'], 'Q-Type': sample['Q-Type']})
-        data += data_aug
+        rel_entity_dict = collect_entity(dataset_name)
+        random_entity_names = collect_entity_v2(dataset_name, rel_entity_dict)
 
+        global_ent_mapping = {}   # we use a global mapping to ensure the consistency of entities and avoid confusion
+        global_names_cnt = {}
+        global_time_offset = random.randint(-20, 5)
 
-    if f_CoT_bs:
-        # Convert list of dictionaries to the desired format
-        data_dict = {'story': [item["story"] for item in data],
-                     'TG': [item["TG"] for item in data],
-                     'Q': [item["question"] for item in data], 
-                     'A': [item["answer"] for item in data],
-                     'EK': [item["EK"] if "EK" in item else None for item in data],
-                     'CoT': [CoT_sampling(item["CoT"], item['CoT_sample_prob']) if "CoT" in item else None for item in data],
-                     'C': [item["candidates"] if "candidates" in item else None for item in data],
-                     'id': [item['id'] for item in data],
-                     'Q-Type': [item['Q-Type'] if 'Q-Type' in item else Q_type for item in data]}
-    else:
-        # Convert list of dictionaries to the desired format
-        data_dict = {'story': [item["story"] for item in data],
-                     'TG': [item["TG"] for item in data],
-                     'Q': [item["question"] for item in data], 
-                     'A': [item["answer"] for item in data],
-                     'EK': [item["EK"] if "EK" in item else None for item in data],
-                     'CoT': [item["CoT"] if "CoT" in item else None for item in data],
-                     'C': [item["candidates"] if "candidates" in item else None for item in data],
-                     'id': [item['id'] for item in data],
-                     'Q-Type': [item['Q-Type'] if 'Q-Type' in item else Q_type for item in data]}
+        extra_data = [rel_entity_dict, global_ent_mapping, global_names_cnt, random_entity_names, global_time_offset]
 
-    # Convert your data into a dataset
-    dataset = Dataset.from_dict(data_dict)
+        data_aug_dict = {'story': [], 'TG': [], 'external knowledge': [], 'question': [], 'CoT': [], 'candidates': [], 'answer': [], 'id': [], 'Q-Type': []}
+        for sample in dataset:
+            TG, EK, Q, CoT, C, A = data_augmentation(dataset_name, sample['TG'], sample['external knowledge'], sample['question'], sample['CoT'], 
+                                                    sample['candidates'], sample['answer'], 
+                                                    flag_rm_irr_edges=True, flag_change_relations=True, 
+                                                    flag_change_entities=True, flag_change_times=True, extra_data=extra_data)
+            data_aug_dict['story'].append(sample['story'])
+            data_aug_dict['TG'].append(TG)
+            data_aug_dict['external knowledge'].append(EK)
+            data_aug_dict['question'].append(Q)
+            data_aug_dict['CoT'].append(CoT)
+            data_aug_dict['candidates'].append(C)
+            data_aug_dict['answer'].append(A)
+            data_aug_dict['id'].append(sample['id'])
+            data_aug_dict['Q-Type'].append(sample['Q-Type'])
+
+        dataset_aug = Dataset.from_dict(data_aug_dict)
+        
+        dataset = concatenate_datasets([dataset, dataset_aug])
+
 
     return dataset
 
@@ -413,26 +129,16 @@ def read_data(dataset_name, filename, f_CoT_bs=0, f_data_aug=0):
 
 
 
-if f_data_aug:
-    rel_entity_dict = collect_entity()
-    random_entity_names = collect_entity_v2(rel_entity_dict)
-
-    global_ent_mapping = {} # we use a global mapping to ensure the consistency of entities and avoid confusion
-    global_names_cnt = {}
-    global_time_offset = random.randint(-20, 5)
+prefix = ['', 'easy_', 'hard_', 'l2_', 'l3_'][dataset_selection]
+data_train = read_data(dataset_name, prefix, 'train', f_CoT_bs, f_data_aug)
+data_val = read_data(dataset_name, prefix, 'val', f_CoT_bs, f_data_aug)
+data_test = read_data(dataset_name, prefix, 'test')
 
 
-
-filename = ['TGSR_train.json', 'TGSR_easy_train.json', 'TGSR_hard_train.json', 'TGSR_l2_train.json', 'TGSR_l3_train.json'][dataset_selection]
-data_train = read_data(dataset_name, filename, f_CoT_bs, f_data_aug)
-
-filename = ['TGSR_val.json', 'TGSR_easy_val.json', 'TGSR_hard_val.json', 'TGSR_l2_val.json', 'TGSR_l3_val.json'][dataset_selection]
-data_val = read_data(dataset_name, filename, f_CoT_bs, f_data_aug)
-
-filename = ['TGSR_test.json', 'TGSR_easy_test.json', 'TGSR_hard_test.json', 'TGSR_l2_test.json', 'TGSR_l3_test.json'][dataset_selection]
-data_test = read_data(dataset_name, filename)
-
-
+if f_unit_test:
+    data_train = create_subset(data_train, 10)
+    data_val = create_subset(data_val, 10)
+    data_test = create_subset(data_test, 10)
 
 
 print(data_train)
@@ -443,10 +149,11 @@ print(data_test)
 
 
 
+
 if f_test:
     # use estimated temporal graph for test
     TG_pred = {}
-    path_TG_pred = f'../results/{dataset_name_short}_story_TG_trans/'
+    path_TG_pred = f'../results/{dataset_name}_story_TG_trans/'
     for filename in os.listdir(path_TG_pred):
         file_path = os.path.join(path_TG_pred, filename)
         with open(file_path) as json_file:
@@ -456,22 +163,7 @@ if f_test:
 
 
 
-
-
-
-def process_id(sample_id):
-    '''
-    Process the sample id.
-    '''
-    story_id = sample_id
-    if dataset_name_short == 'TimeQA':
-        story_id = story_id[:-2]
-    if dataset_name_short == 'TempReason':
-        story_id = story_id[2:-2]
-    return story_id
-
-
-def my_generate_prompt(TG, EK, Q, CoT, A, Q_type=None, mode=None, eos_token="</s>"):
+def my_generate_prompt(TG, EK, Q, CoT, A, Q_type=None, mode=None, eos_token=""):
     '''
     Generate the prompt for the model.
 
@@ -494,10 +186,11 @@ def my_generate_prompt(TG, EK, Q, CoT, A, Q_type=None, mode=None, eos_token="</s
     if f_ICL and mode == 'test':
         if dataset_name == 'TGQA':
             Q_type = f'Q{Q_type}'
+
         if Q_type is None:
-            file_path = f'../materials/{dataset_name_short}/prompt_examples_TGSR.txt'
+            file_path = f'../materials/{dataset_name}/prompt_examples_TGR{split_name}.txt'
         else:
-            file_path = f'../materials/{dataset_name_short}/prompt_examples_TGSR_{Q_type}.txt'
+            file_path = f'../materials/{dataset_name}/prompt_examples_TGR_{Q_type}.txt'
         with open(file_path) as txt_file:
             prompt_examples = txt_file.read()
 
@@ -526,19 +219,19 @@ def my_generate_prompt(TG, EK, Q, CoT, A, Q_type=None, mode=None, eos_token="</s
 
 
 
+if f_print_example_prompt:
+    for i in range(5):
+        if f_train:
+            sample = data_train[i]
+            prompt = my_generate_prompt(sample['TG'], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer'], mode='train', eos_token="</s>")
 
-for i in range(5):
-    if f_train:
-        sample = data_train[i]
-        prompt = my_generate_prompt(sample['TG'], sample['EK'], sample['Q'], sample['CoT'], sample['A'], mode='train')
+        if f_test:
+            sample = data_test[i]
+            story_id = process_id(dataset_name, sample['id'])
+            prompt = my_generate_prompt(TG_pred[story_id], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer'], Q_type=sample['Q-Type'], mode='test')
 
-    if f_test:
-        sample = data_test[i]
-        story_id = process_id(sample['id'])
-        prompt = my_generate_prompt(TG_pred[story_id], sample['EK'], sample['Q'], sample['CoT'], sample['A'], Q_type=sample['Q-Type'], mode='test', eos_token="")
-
-    print(prompt)
-    print('===============================')
+        print(prompt)
+        print('===============================')
 
 
 
@@ -579,7 +272,7 @@ if f_train:
     model = prepare_model_for_kbit_training(model)
     model = get_peft_model(model, lora_config)
 
-    output_dir = f"../model_weights/{dataset_name}_TGSR"
+    output_dir = f"../model_weights/{dataset_name}_TGR{split_name}"
     per_device_train_batch_size = 12
     gradient_accumulation_steps = 4
     per_device_eval_batch_size = 12
@@ -589,7 +282,7 @@ if f_train:
     logging_steps = 10
     learning_rate = 5e-4
     max_grad_norm = 0.3
-    max_steps = 50
+    max_steps = 5 if f_unit_test else 50
     warmup_ratio = 0.03
     evaluation_strategy="steps"
     lr_scheduler_type = "constant"
@@ -619,8 +312,8 @@ if f_train:
         Given the sample, generate the prompt for the model.
         '''
         output = []
-        for g, e, q, cot, a in zip(sample['TG'], sample['EK'], sample['Q'], sample['CoT'], sample['A'], mode='train'):
-            op = my_generate_prompt(g, e, q, cot, a)
+        for g, e, q, cot, a in zip(sample['TG'], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer']):
+            op = my_generate_prompt(g, e, q, cot, a, mode='train', eos_token="</s>")
             output.append(op)
 
         return output
@@ -694,33 +387,33 @@ if f_test:
     tokenizer.pad_token_id = 0
     tokenizer.padding_side = 'left'
 
-    peft_model_id = f"../model_weights/{dataset_name}_TGSR/final"
+    peft_model_id = f"../model_weights/{dataset_name}_TGR{split_name}/final"
     peft_model = PeftModel.from_pretrained(model, peft_model_id, torch_dtype=torch.float16, offload_folder="lora_results/lora_7/temp")
 
-    folder_path = f'../results/{dataset_name}_TGSR'
+    folder_path = f'../results/{dataset_name}_TGR{split_name}'
     if not os.path.exists(folder_path):
         os.mkdir(folder_path)
 
+    batch_size = 8
 
     input_prompts = []
     file_paths = []
     samples = []
     for i in range(len(data_test)):
-        # collect the prompts for 8 samples as a batch
         file_path = folder_path + f'/{str(i)}.json'
         if os.path.exists(file_path) and (not f_rewrite):
             continue
 
         sample = data_test[i]
-        story_id = process_id(sample['id'])
-        cur_prompt = my_generate_prompt(TG_pred[story_id], sample['EK'], sample['Q'], None, None, Q_type=sample['Q-Type'], mode='test', eos_token="")
-
+        story_id = process_id(dataset_name, sample['id'])
+        cur_prompt = my_generate_prompt(TG_pred[story_id], sample['external knowledge'], sample['question'], None, None, Q_type=sample['Q-Type'], mode='test')
 
         input_prompts.append(cur_prompt)
         samples.append(sample)
         file_paths.append(file_path)
 
-        if len(input_prompts) >= 8:
+        # collect the prompts as a batch
+        if len(input_prompts) >= batch_size:
             one_batch(tokenizer, input_prompts, samples, file_paths)
             input_prompts = []
             file_paths = []

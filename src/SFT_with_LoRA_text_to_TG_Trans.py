@@ -24,6 +24,7 @@ os.environ["WANDB_DISABLED"] = "true"
 
 
 
+######### Config #########
 
 dataset_selection = 0   # 0: TGQA, 1: TimeQA, 2: TempReason
 f_train = 1  # whether train the model
@@ -31,11 +32,16 @@ f_test = 1  # whether test the model
 f_ICL = 1   # whether use in-context learning during test
 f_rewrite = 1  # whether rewrite existing test results
 f_shorten_story = 1  # whether shorten the story
-f_hard_mode = 1   # whether use hard mode for translation (only know relations) v.s. easy mode (know entities, relations and times)
+f_hard_mode = 0   # whether use hard mode for translation (only know relations) v.s. easy mode (know entities, relations and times)
+f_print_example_prompt = True  # whether to print the example prompt for the model
+f_unit_test = False  # whether to run the unit test (only for debugging)
 
 # If we want to test the transfer learning performance, just change the transferred dataset name.
 # Note: current dataset_name should be 'TGQA', transferred_dataset_name = None (no transfer learning)
 transferred_dataset_name = [None, 'TimeQA', 'TempReason'][0]  
+
+###########################
+
 
 
 dataset_name = ['TGQA', 'TimeQA', 'TempReason'][dataset_selection]
@@ -45,6 +51,12 @@ dataset = load_dataset("sxiong/TGQA", f'{dataset_name}_Story_TG_Trans')
 data_train = dataset['train']
 data_val = dataset['val']
 data_test = dataset['test']
+
+
+if f_unit_test:
+    data_train = create_subset(data_train, 10)
+    data_val = create_subset(data_val, 10)
+    data_test = create_subset(data_test, 10)
 
 
 print(data_train)
@@ -88,7 +100,7 @@ def my_generate_prompt(story, TG, entities, relation, times, mode=None, eos_toke
     times = ' , '.join(add_brackets(times)) if times is not None else None
 
     if f_shorten_story:
-        story = ' '.join(story.split(' ')[:2000])  # simply shorten the story to 2000 words
+        story = ' '.join(story.split(' ')[:1000])  # simply shorten the story to 1000 words
 
     if relation is None:
         # If we do not have such information extracted from the questions, we will translate the whole story.
@@ -114,16 +126,16 @@ def my_generate_prompt(story, TG, entities, relation, times, mode=None, eos_toke
 
 
 
-
-for i in range(5):
-    if f_train:
-        sample = data_train[i]
-        prompt = my_generate_prompt(sample['story'], sample['TG'], sample['entities'], sample['relation'], sample['times'], mode='train', eos_token="</s>")
-    if f_test:
-        sample = data_test[i]
-        prompt = my_generate_prompt(sample['story'], None, sample['entities'], sample['relation'], sample['times'], mode='test', eos_token="")
-    print(prompt)
-    print('===============================')
+if f_print_example_prompt:
+    for i in range(5):
+        if f_train:
+            sample = data_train[i]
+            prompt = my_generate_prompt(sample['story'], sample['TG'], sample['entities'], sample['relation'], sample['times'], mode='train', eos_token="</s>")
+        if f_test:
+            sample = data_test[i]
+            prompt = my_generate_prompt(sample['story'], None, sample['entities'], sample['relation'], sample['times'], mode='test', eos_token="")
+        print(prompt)
+        print('===============================')
 
 
 
@@ -174,7 +186,7 @@ if f_train:
     logging_steps = 10
     learning_rate = 5e-4
     max_grad_norm = 0.3
-    max_steps = 50
+    max_steps = 5 if f_unit_test else 50
     warmup_ratio = 0.03
     evaluation_strategy="steps"
     lr_scheduler_type = "constant"
