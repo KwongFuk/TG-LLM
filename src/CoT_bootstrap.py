@@ -6,54 +6,39 @@ import numpy as np
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from datasets import Dataset
+from datasets import load_dataset
+from utlis import *
+from tqdm import tqdm
+import itertools
 
 os.environ["WANDB_DISABLED"] = "true"
 
 
 
 
-def read_data(dataset_name, filename):
-    '''
-    Read the data from the json file and convert it into a dataset
-    '''
-    file_path = f'../dataset/{dataset_name.split('_')[0]}/{filename}'
-    with open(file_path) as json_file:
-        data = json.load(json_file)
 
-    # Convert list of dictionaries to the desired format
-    data_dict = {'story': [item["story"] for item in data],
-                 'TG': [item["TG"] for item in data],
-                 'question': [item["question"] for item in data], 
-                 'answer': [item["answer"] for item in data],
-                 'EK': [item["EK"] if "EK" in item else None for item in data],
-                 'CoT': [item["CoT"] if "CoT" in item else None for item in data],
-                 'candidates': [item["candidates"] if "candidates" in item else None for item in data],
-                 'id': [item['id'] for item in data],
-                 'Q-Type': [item['Q-Type'] if 'Q-Type' in item else None for item in data]}
-
-    # Convert your data into a dataset
-    dataset = Dataset.from_dict(data_dict)
-
-    return dataset
 
 
 
 
 dataset_selection = 0  # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
-dataset_name = ['TGQA', 'TimeQA_easy', 'TimeQA_hard', 'TempReason_l2', 'TempReason_l3'][dataset_selection]
+dataset_name = ['TGQA', 'TimeQA', 'TimeQA', 'TempReason', 'TempReason'][dataset_selection]
 
 
-filename_train = ['TGSR_train.json', 'TGSR_easy_train.json', 'TGSR_hard_train.json', 'TGSR_l2_train.json', 'TGSR_l3_train.json'][dataset_selection]
-data_train = read_data(dataset_name, filename_train)
+dataset = load_dataset("sxiong/TGQA", f'{dataset_name}_TGR')
 
-filename_val = ['TGSR_val.json', 'TGSR_easy_val.json', 'TGSR_hard_val.json', 'TGSR_l2_val.json', 'TGSR_l3_val.json'][dataset_selection]
-data_val = read_data(dataset_name, filename_val)
+split_train = ['train', 'easy_train', 'hard_train', 'l2_train', 'l3_train'][dataset_selection]
+data_train = dataset[split_train]
+
+split_val = ['val', 'easy_val', 'hard_val', 'l2_val', 'l3_val'][dataset_selection]
+data_val = dataset[split_val]
 
 
 
 print(data_train)
 print(data_val)
+
+
 
 
 
@@ -70,14 +55,12 @@ def my_generate_prompt(TG, EK, Q):
     Returns:
     prompt: string, the prompt for the model
     '''
-    if isinstance(TG, list):
-        TG = '\n'.join(TG)
+    TG = '\n'.join(TG)
 
     prompt = f"Timeline:\n{TG}\n\nQuestion: {Q}"
 
     if EK is not None:
-        if isinstance(EK, list):
-            EK = '\n'.join(EK)
+        EK = '\n'.join(EK)
         prompt += f"\n\nUseful information:\n{EK}"
 
     prompt += "\n\nAnswer: Let's think step by step.\n\n"
@@ -89,9 +72,10 @@ def my_generate_prompt(TG, EK, Q):
 
 for i in range(5):
     sample = data_train[i]
-    prompt = my_generate_prompt(sample['TG'], sample['EK'], sample['question'])
+    prompt = my_generate_prompt(sample['TG'], sample['external knowledge'], sample['question'])
     print(prompt)
     print('===============================')
+
 
 
 
@@ -99,25 +83,19 @@ for i in range(5):
 model_name = "meta-llama/Llama-2-13b-hf" # you can change to other models
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
+tokenizer.pad_token_id = 0
+tokenizer.padding_side = 'right'
+
 
 model = AutoModelForCausalLM.from_pretrained(model_name,
                                             load_in_8bit=True,
                                             device_map="auto"
                                             )
 
+model.eval()  # Set the model to evaluation mode
 
 
 
-def process_CoT(ans_pred):
-    '''
-    Remove the final answer from the CoT since we need to calculate the perplexity of the candidates.
-    '''
-    ans_pred = ans_pred.strip()
-    for identifier in [' the answer is ', 'Answer:', ' answer is:', ' the correct answer is', ' the answers are ']:
-        if identifier in ans_pred:
-            ans_pred = ans_pred.split(identifier)[0].strip()
-            break
-    return ans_pred + ' the answer is '
 
 
 
@@ -132,42 +110,65 @@ def one_batch(input_prompts, samples):
     Returns:
     samples: the samples with the CoT sample probability, dict
     '''
-    gamma = 0.5  # score = logProbs_pos + gamma*(logProbs_pos - logProbs_neg)
+    gamma = 0.5    # score = logProbs_pos + gamma*(logProbs_pos - logProbs_neg)
     for j in range(len(input_prompts)):
-        context_len = tokenizer(input_prompts[j], return_tensors="pt")["input_ids"].shape[1]
         cur_sample = samples[j]
-        scores = []
-        for CoT in cur_sample['CoT']:
-            cur_prompt = input_prompts[j] + process_CoT(CoT)
-            logProb_neg = []
-            for cand in cur_sample['candidates']:
-                input_tokens = tokenizer(cur_prompt + cand, return_tensors="pt")["input_ids"].to("cuda")
-                target_ids = input_tokens.clone()
-                target_ids[:, :context_len] = -100
-                with torch.no_grad():
-                    outputs = model(input_tokens, labels=target_ids)
-                    loss = outputs.loss.cpu().numpy()
-                    logProb_neg.append(loss)
-         
-            logProb_neg = np.mean(logProb_neg)
 
+        # Prepare the combinations of CoT and candidates
+        neg_ans = [cand for cand in cur_sample['candidates'] if cand not in cur_sample['answer']]
+        combinations = list(itertools.product(cur_sample['CoT'], neg_ans + cur_sample['answer']))
+        cur_prompts = []
+        context_len = []
+        for comb in combinations:
+            cur_prompts.append(input_prompts[j] + process_CoT(comb[0]) + comb[1])
+            context_len.append(tokenizer(input_prompts[j] + process_CoT(comb[0]), return_tensors="pt")["input_ids"].shape[1])
 
-            input_tokens = tokenizer(cur_prompt + cur_sample['answer'], return_tensors="pt")["input_ids"].to("cuda")
-            target_ids = input_tokens.clone()
-            target_ids[:, :context_len] = -100  # mask the context before the answer
-            with torch.no_grad():
-                outputs = model(input_tokens, labels=target_ids)
-                loss = outputs.loss.cpu().numpy()
-                logProbs_pos = loss
-            
-            scores.append(logProbs_pos + gamma*(logProbs_pos - logProb_neg))
+        # Tokenize the entire batch of answers at once with truncation
+        input_tokens = tokenizer(cur_prompts, return_tensors="pt", padding=True, truncation=True, max_length=2048)["input_ids"].to("cuda")        
 
+        # Create target_ids with masked context
+        target_ids = input_tokens.clone()
+        for i in range(len(context_len)):
+            target_ids[i, :context_len[i]] = -100  # mask the context before the answer
+
+        # Mask padding tokens
+        padding_mask = input_tokens == tokenizer.pad_token_id
+        target_ids[padding_mask] = -100  # mask the padding tokens
+
+        # Process the batch
+        with torch.no_grad():
+            outputs = model(input_tokens, labels=target_ids)
+            logits = outputs.logits
+
+        # Calculate loss per token
+        shift_logits = logits[:, :-1, :].contiguous()
+        shift_labels = target_ids[:, 1:].contiguous()
+        loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
+        loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+
+        # Reshape loss to match input tokens shape
+        loss = loss.view(shift_labels.size())
+
+        # Mask loss for padding tokens
+        loss[padding_mask[:, 1:]] = 0.0
+
+        # Aggregate loss for each answer
+        loss_per_answer = loss.sum(dim=1) / (loss != 0).sum(dim=1)
+        loss_per_answer = loss_per_answer.cpu().numpy()
+
+        # Split the losses back to individual CoTs
+        loss_per_answer = loss_per_answer.reshape((len(cur_sample['CoT']), -1))
+        logProbs_pos = np.mean(loss_per_answer[:, len(neg_ans):], axis=1)
+        logProbs_neg = np.mean(loss_per_answer[:, :len(neg_ans)], axis=1)
+
+        # Constrastive score:
+        scores = logProbs_pos + gamma*(logProbs_pos - logProbs_neg)
         scores = [np.exp(-10*s) for s in scores]
+
+        # Normalize the scores to get the probability
         cur_sample['CoT_sample_prob'] = (scores/np.sum(scores)).tolist()
 
-
     return samples
-
 
 
 
@@ -183,7 +184,7 @@ def CoT_bootstrap(data, filename):
     Returns:
     None
     '''
-    folder_path = f'../results/{dataset_name}_SR_bs'
+    folder_path = f'../results/{dataset_name}_TGR_bs'
     if not os.path.exists(folder_path):
         os.mkdir(folder_path)
 
@@ -193,9 +194,8 @@ def CoT_bootstrap(data, filename):
     input_prompts = []
     input_samples = []
 
-    for i in range(len(data)):
-        sample = data[i]
-        cur_prompt = my_generate_prompt(sample['TG'], sample['EK'], sample['question'])
+    for sample in tqdm(data):
+        cur_prompt = my_generate_prompt(sample['TG'], sample['external knowledge'], sample['question'])
         input_prompts.append(cur_prompt)
         input_samples.append(sample)
 
@@ -205,18 +205,18 @@ def CoT_bootstrap(data, filename):
             input_prompts = []
             input_samples = []
 
-
     # Last batch that is less than batch_size
     if len(input_prompts) > 0:
         samples = one_batch(input_prompts, input_samples)
         data_new += samples
 
 
-    file_path = f'{folder_path}/{filename}'
+    file_path = f'{folder_path}/{filename}.json'
     with open(file_path, 'w') as json_file:
         json.dump(data_new, json_file)
 
     return
 
 
-CoT_bootstrap(data_train, filename_train)
+
+CoT_bootstrap(data_train, split_train)

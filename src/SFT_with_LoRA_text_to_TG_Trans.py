@@ -13,7 +13,7 @@ from peft import (
 from trl import SFTTrainer
 from peft import PeftModel
 from datasets import load_dataset
-
+from tqdm import tqdm
 from utlis import *
 
 os.environ["WANDB_DISABLED"] = "true"
@@ -26,7 +26,7 @@ os.environ["WANDB_DISABLED"] = "true"
 
 
 dataset_selection = 0   # 0: TGQA, 1: TimeQA, 2: TempReason
-f_train = 1  # whether train the model
+f_train = 0  # whether train the model
 f_test = 1  # whether test the model
 f_ICL = 1   # whether use in-context learning during test
 f_rewrite = 1  # whether rewrite existing test results
@@ -45,6 +45,7 @@ dataset = load_dataset("sxiong/TGQA", f'{dataset_name}_Story_TG_Trans')
 data_train = dataset['train']
 data_val = dataset['val']
 data_test = dataset['test']
+
 
 print(data_train)
 print(data_val)
@@ -232,11 +233,12 @@ if f_train:
 
 
 if f_test:
-    def one_batch(tokenizer, input_prompts, samples, file_paths, max_new_tokens=512):
+    def one_batch(model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=512):
         '''
         Given the promot, generate the output and save the results
 
         Args:
+        - model: the model
         - tokenizer: the tokenizer
         - input_prompts: list, the list of prompts
         - samples: list, the list of samples
@@ -249,7 +251,7 @@ if f_test:
         input_tokens = tokenizer(input_prompts, padding='longest', return_tensors="pt")["input_ids"].to("cuda")
 
         with torch.cuda.amp.autocast():
-            generation_output = peft_model.generate(
+            generation_output = model.generate(
                 input_ids=input_tokens,
                 max_new_tokens=max_new_tokens,
                 do_sample=True,
@@ -273,13 +275,14 @@ if f_test:
 
         return
 
-
+    
     # we need padding on the left side to create the embeddings for a whole batch
     tokenizer.pad_token_id = 0
     tokenizer.padding_side = 'left'
 
     peft_model_id = f"../model_weights/{dataset_name}_story_TG_trans/final"
     peft_model = PeftModel.from_pretrained(model, peft_model_id, torch_dtype=torch.float16, offload_folder="lora_results/lora_7/temp")
+    peft_model.eval()  # Set the model to evaluation mode
 
     folder_path = f'../results/{dataset_name}_story_TG_trans'
     if not os.path.exists(folder_path):
@@ -290,8 +293,7 @@ if f_test:
     input_prompts = []
     file_paths = []
     samples = []
-    for i in range(len(data_test)):
-        # collect the prompts for 4 samples as a batch
+    for i in tqdm(range(len(data_test))):
         file_path = folder_path + f'/{str(i)}.json'
         if (os.path.exists(file_path)) and (not f_rewrite):
             continue
@@ -299,17 +301,17 @@ if f_test:
         sample = data_test[i]
         cur_prompt = my_generate_prompt(sample['story'], None, sample['entities'], sample['relation'], sample['times'], mode='test', eos_token='')
 
-
         input_prompts.append(cur_prompt)
         samples.append(sample)
         file_paths.append(file_path)
 
+        # collect the prompts as a batch
         if len(input_prompts) >= batch_size:
-            one_batch(tokenizer, input_prompts, samples, file_paths, max_new_tokens=1024)
+            one_batch(peft_model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=1024)
             input_prompts = []
             file_paths = []
             samples_info = []
 
     # Last batch that is less than batch_size
     if len(input_prompts) > 0:
-        one_batch(tokenizer, input_prompts, samples, file_paths, max_new_tokens=1024)
+        one_batch(peft_model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=1024)
