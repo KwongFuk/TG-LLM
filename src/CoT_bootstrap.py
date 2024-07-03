@@ -1,15 +1,13 @@
 import sys
 import json
 import os
-import numpy as np
 
-
-import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
 from utlis import *
+from Models import *
 from tqdm import tqdm
-import itertools
+from prompt_generation import *
 
 os.environ["WANDB_DISABLED"] = "true"
 
@@ -51,39 +49,10 @@ print(data_val)
 
 
 
-
-
-
-def my_generate_prompt(TG, EK, Q):
-    '''
-    Generate the prompt for the model
-    
-    Args:
-    TG: list of strings, temporal graph
-    EK: list of strings, external knowledge
-    Q: string, the question
-    
-    Returns:
-    prompt: string, the prompt for the model
-    '''
-    TG = '\n'.join(TG)
-
-    prompt = f"Timeline:\n{TG}\n\nQuestion: {Q}"
-
-    if EK is not None:
-        EK = '\n'.join(EK)
-        prompt += f"\n\nUseful information:\n{EK}"
-
-    prompt += "\n\nAnswer: Let's think step by step.\n\n"
-
-    return prompt
-
-
-
 if f_print_example_prompt:
     for i in range(5):
         sample = data_train[i]
-        prompt = my_generate_prompt(sample['TG'], sample['external knowledge'], sample['question'])
+        prompt = my_generate_prompt_CoT_bs(sample['TG'], sample['external knowledge'], sample['question'])
         print(prompt)
         print('===============================')
 
@@ -107,102 +76,7 @@ model.eval()  # Set the model to evaluation mode
 
 
 
-
-
-
-def one_batch(input_prompts, samples):
-    '''
-    For each sample, calculate the contrastive score for each CoT. Then save the results to the corresponding files.
-    
-    Args:
-    input_prompts: the input prompts, list
-    samples: the samples, dict
-
-    Returns:
-    samples: the samples with the CoT sample probability, dict
-    '''
-    gamma = 0.5    # score = logProbs_pos + gamma*(logProbs_pos - logProbs_neg)
-    for j in range(len(input_prompts)):
-        cur_sample = samples[j]
-
-        # Prepare the combinations of CoT and candidates
-        neg_ans = [cand for cand in cur_sample['candidates'] if cand not in cur_sample['answer']]
-        combinations = list(itertools.product(cur_sample['CoT'], neg_ans + cur_sample['answer']))
-        cur_prompts = []
-        context_len = []
-        for comb in combinations:
-            context = input_prompts[j] + process_CoT(comb[0])
-            cur_prompts.append(context + comb[1])
-            
-            len_bf = tokenizer(context, return_tensors="pt")["input_ids"].shape[1]
-            len_af = tokenizer(context + comb[1], return_tensors="pt")["input_ids"].shape[1]
-            
-            # The length of the context should be at least 1 less than the length of all the tokens
-            context_len.append(min(len_bf, len_af-1))
-        
-
-        # Tokenize the entire batch of answers at once with truncation
-        input_tokens = tokenizer(cur_prompts, return_tensors="pt", padding=True, truncation=True, max_length=2048)["input_ids"].to("cuda")        
-
-        # Create target_ids with masked context
-        target_ids = input_tokens.clone()
-        for i in range(len(context_len)):
-            target_ids[i, :context_len[i]] = -100  # mask the context before the answer
-
-        # Mask padding tokens
-        padding_mask = input_tokens == tokenizer.pad_token_id
-        target_ids[padding_mask] = -100  # mask the padding tokens
-
-        # # Verify target_ids
-        # print("Target IDs after padding mask:", target_ids)
-
-        # Process the batch
-        with torch.no_grad():
-            outputs = model(input_tokens, labels=target_ids)
-            logits = outputs.logits
-
-        # Calculate loss per token
-        shift_logits = logits[:, :-1, :].contiguous()
-        shift_labels = target_ids[:, 1:].contiguous()
-        loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
-        loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-
-        # Reshape loss to match input tokens shape
-        loss = loss.view(shift_labels.size())
-
-        # Mask loss for padding tokens
-        loss[padding_mask[:, 1:]] = 0.0
-
-        # # Verify loss tensor
-        # print("Loss tensor:", loss)
-
-        # Aggregate loss for each answer
-        valid_counts = (loss != 0).sum(dim=1)
-        valid_counts[valid_counts == 0] = 1  # Avoid division by zero
-        loss_per_answer = loss.sum(dim=1) / valid_counts
-        loss_per_answer = loss_per_answer.cpu().numpy()
-
-        # Split the losses back to individual CoTs
-        loss_per_answer = loss_per_answer.reshape((len(cur_sample['CoT']), -1))
-        logProbs_pos = np.mean(loss_per_answer[:, len(neg_ans):], axis=1)
-        logProbs_neg = np.mean(loss_per_answer[:, :len(neg_ans)], axis=1)
-
-        # print("Loss per answer:", loss_per_answer)
-        # print("Log Probs Pos:", logProbs_pos)
-        # print("Log Probs Neg:", logProbs_neg)
-
-        # Constrastive score:
-        scores = logProbs_pos + gamma*(logProbs_pos - logProbs_neg)
-        scores = [np.exp(-10*s) for s in scores]
-
-        # Normalize the scores to get the probability
-        cur_sample['CoT_sample_prob'] = (scores/np.sum(scores)).tolist()
-
-    return samples
-
-
-
-def CoT_bootstrap(data, filename):
+def CoT_bootstrap(data, filename, model, tokenizer):
     '''
     Given a list of CoT for each sample that leads to the correct final answer, calculate the probability of each CoT for each sample.
     Todo: Here we start from the data with filtered CoTs. We can also start from the data with no CoTs, and we need to generate and filter the CoTs in this function.
@@ -225,19 +99,19 @@ def CoT_bootstrap(data, filename):
     input_samples = []
 
     for sample in tqdm(data):
-        cur_prompt = my_generate_prompt(sample['TG'], sample['external knowledge'], sample['question'])
+        cur_prompt = my_generate_prompt_CoT_bs(sample['TG'], sample['external knowledge'], sample['question'])
         input_prompts.append(cur_prompt)
         input_samples.append(sample)
 
         if len(input_prompts) >= batch_size:
-            samples = one_batch(input_prompts, input_samples)
+            samples = run_one_batch_CoT_bs(model, tokenizer, input_prompts, input_samples)
             data_new += samples
             input_prompts = []
             input_samples = []
 
     # Last batch that is less than batch_size
     if len(input_prompts) > 0:
-        samples = one_batch(input_prompts, input_samples)
+        samples = run_one_batch_CoT_bs(model, tokenizer, input_prompts, input_samples)
         data_new += samples
 
 
@@ -248,5 +122,4 @@ def CoT_bootstrap(data, filename):
     return
 
 
-
-CoT_bootstrap(data_train, split_train)
+CoT_bootstrap(data_train, split_train, model, tokenizer)

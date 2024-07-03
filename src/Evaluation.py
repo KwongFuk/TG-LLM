@@ -35,9 +35,7 @@ else:
 if f_ppl:
     folder_path += '_ppl'
 
-
-
-
+print(folder_path)
 
 
 
@@ -143,7 +141,7 @@ for i in range(num_question_cat):
 
 
 
-print('EM:')
+print('\nEM:')
 print(np.mean([EM_dict[i][0] for i in range(num_question_cat) if EM_dict[i][1] > 0]), sum(EM_dict[i][1] for i in range(num_question_cat)))
 
 

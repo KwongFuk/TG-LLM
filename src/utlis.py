@@ -3,6 +3,9 @@ import os
 import copy
 from datasets import load_dataset
 import sys
+import json
+
+
 
 
 
@@ -408,3 +411,23 @@ def parse_TG_pred(pred):
 
 def replace_empty_answer_as_unknown(ans):
     return [a if len(a)>0 else 'Unknown' for a in ans]
+
+
+def obtain_TG_pred(dataset_name):
+    '''
+    Obtain the estimated temporal graph for the test set.
+
+    args:
+        dataset_name: string, dataset name
+
+    return:
+        TG_pred: dict, the estimated temporal graph
+    '''
+    TG_pred = {}
+    path_TG_pred = f'../results/{dataset_name}_story_TG_trans/'
+    for filename in os.listdir(path_TG_pred):
+        file_path = os.path.join(path_TG_pred, filename)
+        with open(file_path) as json_file:
+            data = json.load(json_file)
+        TG_pred[data['id']] = parse_TG_pred(data['prediction'])
+    return TG_pred

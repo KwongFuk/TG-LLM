@@ -7,18 +7,13 @@ import copy
 
 
 import torch
-import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import (
-        get_peft_model, 
-        prepare_model_for_kbit_training, 
-        LoraConfig
-    )
-from trl import SFTTrainer
 from peft import PeftModel
 from datasets import Dataset, load_dataset, concatenate_datasets
 from utlis import *
 from tqdm import tqdm
+from Models import *
+from prompt_generation import *
 
 os.environ["WANDB_DISABLED"] = "true"
 
@@ -125,11 +120,6 @@ def read_data(dataset_name, prefix, split, f_CoT_bs=0, f_data_aug=0):
 
 
 
-
-
-
-
-
 data_train = read_data(dataset_name, prefix, 'train', f_CoT_bs, f_data_aug)
 data_val = read_data(dataset_name, prefix, 'val', f_CoT_bs, f_data_aug)
 data_test = read_data(dataset_name, prefix, 'test')
@@ -148,70 +138,9 @@ print(data_test)
 
 
 
-
-
 if f_test:
     # use estimated temporal graph for test
-    TG_pred = {}
-    path_TG_pred = f'../results/{dataset_name}_story_TG_trans/'
-    for filename in os.listdir(path_TG_pred):
-        file_path = os.path.join(path_TG_pred, filename)
-        with open(file_path) as json_file:
-            data = json.load(json_file)
-        TG_pred[data['id']] = parse_TG_pred(data['prediction'])
-
-
-
-def my_generate_prompt(TG, EK, Q, CoT, A, Q_type=None, mode=None, eos_token=""):
-    '''
-    Generate the prompt for the model.
-
-    args:
-        TG: list of strings or string, temporal graph
-        EK: list of strings or string, exteral knowledge
-        Q: string, question
-        CoT: list of strings, chain of thought
-        A: string, answer
-        Q_type: string, question type
-        mode: string, mode
-        eos_token: string, eos token
-
-    return:
-        prompt: string, the prompt
-    '''
-    if isinstance(TG, list):
-        TG = '\n'.join(TG)
-
-    if f_ICL and mode == 'test':
-        if dataset_name == 'TGQA':
-            Q_type = f'Q{Q_type}'
-
-        if Q_type is None:
-            file_path = f'../materials/{dataset_name}/prompt_examples_TGR{split_name}.txt'
-        else:
-            file_path = f'../materials/{dataset_name}/prompt_examples_TGR_{Q_type}.txt'
-        with open(file_path) as txt_file:
-            prompt_examples = txt_file.read()
-
-    if f_ICL and mode == 'test':
-        prompt = f"Example:\n\n{prompt_examples}\n\nTest:\n\nTimeline:\n{TG}\n\nQuestion: {Q}"
-    else:
-        prompt = f"Timeline:\n{TG}\n\nQuestion: {Q}"
-
-    if EK is not None:
-        if isinstance(EK, list):
-            EK = '\n'.join(EK)
-        prompt += f"\n\nUseful information:\n{EK}"
-
-    prompt += "\n\nAnswer: Let's think step by step.\n\n"
-
-    if CoT is not None:
-        if isinstance(CoT, list):
-            CoT = CoT[0]
-        prompt += CoT
-
-    prompt += eos_token
-    return prompt
+    TG_pred = obtain_TG_pred(dataset_name)
 
 
 
@@ -220,7 +149,7 @@ if f_print_example_prompt:
     if f_train:
         for i in range(5):
             sample = data_train[i]
-            prompt = my_generate_prompt(sample['TG'], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer'], mode='train', eos_token="</s>")
+            prompt = my_generate_prompt_TG_Reasoning(dataset_name, split_name, sample['TG'], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer'], f_ICL, mode='train', eos_token="</s>")
             print(prompt)
             print('===============================')
 
@@ -229,7 +158,7 @@ if f_print_example_prompt:
             sample = data_test[i]
             story_id = process_id(dataset_name, sample['id'])
             if story_id in TG_pred:
-                prompt = my_generate_prompt(TG_pred[story_id], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer'], Q_type=sample['Q-Type'], mode='test')
+                prompt = my_generate_prompt_TG_Reasoning(dataset_name, split_name, TG_pred[story_id], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer'], f_ICL, Q_type=sample['Q-Type'], mode='test')
                 print(prompt)
                 print('===============================')
 
@@ -254,141 +183,28 @@ model = AutoModelForCausalLM.from_pretrained(model_name,
 
 
 if f_train:
-    # lora config
-    lora_config = LoraConfig(
-        r=8,
-        lora_alpha=8,
-        lora_dropout=0.1,
-        target_modules=["q_proj","k_proj","v_proj","o_proj"],
-        bias="none",
-        task_type="CAUSAL_LM",
-    )
-
-    # this should be set for finutning and batched inference
-    tokenizer.add_special_tokens({"pad_token": "<PAD>"})
-    model.resize_token_embeddings(len(tokenizer))
-
-    # Loading in 8 bit ..."
-    model = prepare_model_for_kbit_training(model)
-    model = get_peft_model(model, lora_config)
-
-    output_dir = f"../model_weights/{dataset_name}_TGR{split_name}"
-    per_device_train_batch_size = 12
-    gradient_accumulation_steps = 4
-    per_device_eval_batch_size = 12
-    eval_accumulation_steps = 4
-    optim = "paged_adamw_32bit"
-    save_steps = 10
-    logging_steps = 10
-    learning_rate = 5e-4
-    max_grad_norm = 0.3
-    max_steps = 5 if f_unit_test else 50
-    warmup_ratio = 0.03
-    evaluation_strategy="steps"
-    lr_scheduler_type = "constant"
-
-    training_args = transformers.TrainingArguments(
-                output_dir=output_dir,
-                per_device_train_batch_size=per_device_train_batch_size,
-                gradient_accumulation_steps=gradient_accumulation_steps,
-                optim=optim,
-                evaluation_strategy=evaluation_strategy,
-                save_steps=save_steps,
-                learning_rate=learning_rate,
-                logging_steps=logging_steps,
-                max_grad_norm=max_grad_norm,
-                max_steps=max_steps,
-                warmup_ratio=warmup_ratio,
-                group_by_length=True,
-                lr_scheduler_type=lr_scheduler_type,
-                ddp_find_unused_parameters=False,
-                eval_accumulation_steps=eval_accumulation_steps,
-                per_device_eval_batch_size=per_device_eval_batch_size
-            )
-
-
     def formatting_func(sample):
         '''
         Given the sample, generate the prompt for the model.
         '''
         output = []
         for g, e, q, cot, a in zip(sample['TG'], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer']):
-            op = my_generate_prompt(g, e, q, cot, a, mode='train', eos_token="</s>")
+            op = my_generate_prompt_TG_Reasoning(dataset_name, split_name, g, e, q, cot, a, f_ICL, mode='train', eos_token="</s>")
             output.append(op)
 
         return output
 
-
-    trainer = SFTTrainer(
-        model=model,
-        train_dataset=data_train,
-        eval_dataset=data_val,
-        peft_config=lora_config,
-        formatting_func=formatting_func,
-        max_seq_length=2048,
-        tokenizer=tokenizer,
-        args=training_args
-    )
-
-    # We will also pre-process the model by upcasting the layer norms in float 32 for more stable training
-    for name, module in trainer.model.named_modules():
-        if "norm" in name:
-            module = module.to(torch.float32)
-
-    trainer.train()
-    trainer.save_model(f"{output_dir}/final")
-
+    output_dir = f"../model_weights/{dataset_name}_TGR{split_name}"
+    SFT_with_LoRA(model, tokenizer, output_dir, f_unit_test, formatting_func, data_train, data_val, 12, 2048)
 
 
 if f_test:
-    def one_batch(tokenizer, input_prompts, samples, file_paths, max_new_tokens=512):
-        '''
-        Generate the predictions for one batch of samples and save the results.
-
-        args:
-            tokenizer: tokenizer
-            input_prompts: list of strings, input prompts
-            samples: list of dictionaries, samples
-            file_paths: list of strings, file paths
-            max_new_tokens: int, maximum number of new tokens
-
-        return:
-            None
-        '''
-        input_tokens = tokenizer(input_prompts, padding='longest', return_tensors="pt")["input_ids"].to("cuda")
-
-        with torch.cuda.amp.autocast():
-            generation_output = peft_model.generate(
-                input_ids=input_tokens,
-                max_new_tokens=max_new_tokens,
-                do_sample=True,
-                top_k=10,
-                top_p=0.9,
-                temperature=0.3,
-                repetition_penalty=1.15,
-                num_return_sequences=1,
-                eos_token_id=tokenizer.eos_token_id,
-              )
-
-
-        for j in range(len(input_prompts)):
-            op = tokenizer.decode(generation_output[j], skip_special_tokens=True)
-            op = op[len(input_prompts[j]):]
-            cur_sample = samples[j]
-            cur_sample.update({'prediction': op})
-
-            with open(file_paths[j], 'w') as json_file:
-                json.dump(cur_sample, json_file)
-
-        return
-
-
-
     tokenizer.pad_token_id = 0
     tokenizer.padding_side = 'left'
 
     peft_model_id = f"../model_weights/{dataset_name}_TGR{split_name}/final"
     peft_model = PeftModel.from_pretrained(model, peft_model_id, torch_dtype=torch.float16, offload_folder="lora_results/lora_7/temp")
+    peft_model.eval()
 
     folder_path = f'../results/{dataset_name}_TGR{split_name}'
     if not os.path.exists(folder_path):
@@ -408,7 +224,7 @@ if f_test:
         story_id = process_id(dataset_name, sample['id'])
         if story_id not in TG_pred:
             continue
-        cur_prompt = my_generate_prompt(TG_pred[story_id], sample['external knowledge'], sample['question'], None, None, Q_type=sample['Q-Type'], mode='test')
+        cur_prompt = my_generate_prompt_TG_Reasoning(dataset_name, split_name, TG_pred[story_id], sample['external knowledge'], sample['question'], None, None, f_ICL, Q_type=sample['Q-Type'], mode='test')
 
         input_prompts.append(cur_prompt)
         samples.append(sample)
@@ -416,11 +232,11 @@ if f_test:
 
         # collect the prompts as a batch
         if len(input_prompts) >= batch_size:
-            one_batch(tokenizer, input_prompts, samples, file_paths)
+            run_one_batch_generation(peft_model, tokenizer, input_prompts, samples, file_paths)
             input_prompts = []
             file_paths = []
             samples = []
 
 
     if len(input_prompts) > 0:
-        one_batch(tokenizer, input_prompts, samples, file_paths)
+        run_one_batch_generation(peft_model, tokenizer, input_prompts, samples, file_paths)

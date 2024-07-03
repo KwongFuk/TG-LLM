@@ -1,20 +1,13 @@
 import sys
-import json
 import os
-
 import torch
-import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import (
-        get_peft_model, 
-        prepare_model_for_kbit_training, 
-        LoraConfig
-    )
-from trl import SFTTrainer
 from peft import PeftModel
 from datasets import load_dataset
 from tqdm import tqdm
 from utlis import *
+from Models import *
+from prompt_generation import *
 
 os.environ["WANDB_DISABLED"] = "true"
 
@@ -68,72 +61,16 @@ print(data_test)
 
 
 
-def my_generate_prompt(story, TG, entities, relation, times, mode=None, eos_token="</s>"):
-    '''
-    Generate the prompt for text to TG translation (given context and keywords, generate the relevant TG)
-
-    Args:
-    - story: str or list, the story
-    - TG: str or list, the TG
-    - entities: str or list, the entities
-    - relation: str, the relation
-    - times: str or list, the times
-    - mode: train or test
-    - eos_token: str, the end of sentence token
-
-    Returns:
-    - prompt: str, the prompt
-    '''
-
-    def add_examples_in_prompt(prompt):
-        if f_ICL and mode == 'test':
-            file_path = f'../materials/{dataset_name}/prompt_examples_text_to_TG_Trans.txt' if (not f_hard_mode) else \
-                        f'../materials/{dataset_name}/prompt_examples_text_to_TG_Trans_hard.txt'
-            with open(file_path) as txt_file:
-                prompt_examples = txt_file.read()
-            prompt = f"\n\n{prompt_examples}\n\nTest:\n{prompt}"
-        return prompt.strip()
-
-
-    # Convert the list to string
-    entities = ' , '.join(add_brackets(entities)) if entities is not None else None
-    times = ' , '.join(add_brackets(times)) if times is not None else None
-
-    if f_shorten_story:
-        story = shorten_story(story)
-
-    if relation is None:
-        # If we do not have such information extracted from the questions, we will translate the whole story.
-        prompt = add_examples_in_prompt(f"{story}\n\nSummary all the events as a timeline.\n\nTimeline:")
-    else:
-        if f_hard_mode or entities is None or times is None:
-            prompt = add_examples_in_prompt(f"{story}\n\nSummary {relation} as a timeline.\n\nTimeline:")
-        else:
-            prompt = add_examples_in_prompt(f"{story}\n\nGiven the time periods: {times}, summary {relation} as a timeline. Choose from {entities}.\n\nTimeline:")
-
-    # For training data, we provide the TG as label.
-    if TG is not None:
-        # Convert the list to string
-        TG = '\n'.join(TG)
-
-        # If we want to test the transfer learning performance, we can change the format of the TG in TGQA to other datasets.
-        TG = TG_formating_change(TG, dataset_name, transferred_dataset_name)
-
-        prompt += f"\n{TG}\n"
-
-    prompt += eos_token
-    return prompt
-
-
-
 if f_print_example_prompt:
     for i in range(5):
         if f_train:
             sample = data_train[i]
-            prompt = my_generate_prompt(sample['story'], sample['TG'], sample['entities'], sample['relation'], sample['times'], mode='train', eos_token="</s>")
+            prompt = my_generate_prompt_TG_trans(dataset_name, sample['story'], sample['TG'], sample['entities'], sample['relation'], sample['times'], 
+                                                 f_ICL, f_shorten_story, f_hard_mode, transferred_dataset_name, mode='train', eos_token="</s>")
         if f_test:
             sample = data_test[i]
-            prompt = my_generate_prompt(sample['story'], None, sample['entities'], sample['relation'], sample['times'], mode='test', eos_token="")
+            prompt = my_generate_prompt_TG_trans(dataset_name, sample['story'], None, sample['entities'], sample['relation'], sample['times'], 
+                                                 f_ICL, f_shorten_story, f_hard_mode, transferred_dataset_name, mode='test', eos_token="")
         print(prompt)
         print('===============================')
 
@@ -155,139 +92,24 @@ model = AutoModelForCausalLM.from_pretrained(model_name,
 
 
 
-
-
 if f_train:
-    # lora config
-    lora_config = LoraConfig(
-        r=8,
-        lora_alpha=8,
-        lora_dropout=0.1,
-        target_modules=["q_proj","k_proj","v_proj","o_proj"],
-        bias="none",
-        task_type="CAUSAL_LM",
-    )
-
-    # this should be set for finutning and batched inference
-    tokenizer.add_special_tokens({"pad_token": "<PAD>"})
-    model.resize_token_embeddings(len(tokenizer))
-
-    # Loading in 8 bit ..."
-    model = prepare_model_for_kbit_training(model)
-    model = get_peft_model(model, lora_config)
-
-    output_dir = f"../model_weights/{dataset_name}_story_TG_trans"
-    per_device_train_batch_size = 4
-    gradient_accumulation_steps = 4
-    per_device_eval_batch_size = 4
-    eval_accumulation_steps = 4
-    optim = "paged_adamw_32bit"
-    save_steps = 10
-    logging_steps = 10
-    learning_rate = 5e-4
-    max_grad_norm = 0.3
-    max_steps = 5 if f_unit_test else 50
-    warmup_ratio = 0.03
-    evaluation_strategy="steps"
-    lr_scheduler_type = "constant"
-
-    training_args = transformers.TrainingArguments(
-                output_dir=output_dir,
-                per_device_train_batch_size=per_device_train_batch_size,
-                gradient_accumulation_steps=gradient_accumulation_steps,
-                optim=optim,
-                evaluation_strategy=evaluation_strategy,
-                save_steps=save_steps,
-                learning_rate=learning_rate,
-                logging_steps=logging_steps,
-                max_grad_norm=max_grad_norm,
-                max_steps=max_steps,
-                warmup_ratio=warmup_ratio,
-                group_by_length=True,
-                lr_scheduler_type=lr_scheduler_type,
-                ddp_find_unused_parameters=False,
-                eval_accumulation_steps=eval_accumulation_steps,
-                per_device_eval_batch_size=per_device_eval_batch_size
-            )
-
-
     def formatting_func(sample):
         '''
         Given a sample, generate the prompt for the model
         '''
         output = []
         for s, g, e, r, t in zip(sample['story'], sample['TG'], sample['entities'], sample['relation'], sample['times']):
-            op = my_generate_prompt(s, g, e, r, t, mode='train')
+            op = my_generate_prompt_TG_trans(dataset_name, s, g, e, r, t, f_ICL, f_shorten_story, f_hard_mode, 
+                                            transferred_dataset_name, mode='train')
             output.append(op)
 
         return output
 
-    # SFT with lora
-    trainer = SFTTrainer(
-        model=model,
-        train_dataset=data_train,
-        eval_dataset=data_val,
-        peft_config=lora_config,
-        formatting_func=formatting_func,
-        max_seq_length=4096,
-        tokenizer=tokenizer,
-        args=training_args
-    )
-
-    # We will also pre-process the model by upcasting the layer norms in float 32 for more stable training
-    for name, module in trainer.model.named_modules():
-        if "norm" in name:
-            module = module.to(torch.float32)
-
-    trainer.train()
-    trainer.save_model(f"{output_dir}/final")
+    output_dir = f"../model_weights/{dataset_name}_story_TG_trans"
+    SFT_with_LoRA(model, tokenizer, output_dir, f_unit_test, formatting_func, data_train, data_val, 4, 4096)
 
 
-
-if f_test:
-    def one_batch(model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=512):
-        '''
-        Given the promot, generate the output and save the results
-
-        Args:
-        - model: the model
-        - tokenizer: the tokenizer
-        - input_prompts: list, the list of prompts
-        - samples: list, the list of samples
-        - file_paths: list, the list of file paths
-        - max_new_tokens: int, the maximum number of tokens to generate
-
-        Returns:
-        - None
-        '''
-        input_tokens = tokenizer(input_prompts, padding='longest', return_tensors="pt")["input_ids"].to("cuda")
-
-        with torch.cuda.amp.autocast():
-            generation_output = model.generate(
-                input_ids=input_tokens,
-                max_new_tokens=max_new_tokens,
-                do_sample=True,
-                top_k=10,
-                top_p=0.9,
-                temperature=0.3,
-                repetition_penalty=1.15,
-                num_return_sequences=1,
-                eos_token_id=tokenizer.eos_token_id,
-              )
-
-
-        for j in range(len(input_prompts)):
-            op = tokenizer.decode(generation_output[j], skip_special_tokens=True)
-            op = op[len(input_prompts[j]):]
-            cur_sample = samples[j]
-            cur_sample.update({'prediction': op})
-
-            with open(file_paths[j], 'w') as json_file:
-                json.dump(cur_sample, json_file)
-
-        return
-
-    
+if f_test: 
     # we need padding on the left side to create the embeddings for a whole batch
     tokenizer.pad_token_id = 0
     tokenizer.padding_side = 'left'
@@ -312,7 +134,8 @@ if f_test:
             continue
 
         sample = data_test[i]
-        cur_prompt = my_generate_prompt(sample['story'], None, sample['entities'], sample['relation'], sample['times'], mode='test', eos_token='')
+        cur_prompt = my_generate_prompt_TG_trans(dataset_name, sample['story'], None, sample['entities'], sample['relation'], sample['times'], 
+                                                 f_ICL, f_shorten_story, f_hard_mode, transferred_dataset_name, mode='test', eos_token='')
 
         input_prompts.append(cur_prompt)
         samples.append(sample)
@@ -320,11 +143,11 @@ if f_test:
 
         # collect the prompts as a batch
         if len(input_prompts) >= batch_size:
-            one_batch(peft_model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=max_new_tokens)
+            run_one_batch_generation(peft_model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=max_new_tokens)
             input_prompts = []
             file_paths = []
             samples_info = []
 
     # Last batch that is less than batch_size
     if len(input_prompts) > 0:
-        one_batch(peft_model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=max_new_tokens)
+        run_one_batch_generation(peft_model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=max_new_tokens)
