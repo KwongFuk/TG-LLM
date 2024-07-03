@@ -23,7 +23,7 @@ os.environ["WANDB_DISABLED"] = "true"
 
 ######### Config #########
 
-dataset_selection = 0  # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
+dataset_selection = 0   # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
 f_print_example_prompt = True  # whether to print the example prompt for the model
 f_unit_test = False  # whether to run the unit test (only for debugging)
 

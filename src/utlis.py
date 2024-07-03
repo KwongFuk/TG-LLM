@@ -388,3 +388,10 @@ def create_subset(dataset, size, shuffle=False, seed=None):
     
     subset = dataset.select(indices)
     return subset
+
+
+def shorten_story(story):
+    '''
+    Shorten the story.
+    '''
+    return ' '.join(story.split(' ')[:1000])  # simply shorten the story to 1000 words

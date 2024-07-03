@@ -9,10 +9,12 @@ import collections
 ######### Config #########
 
 dataset_selection = 0  # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
-model_selection = 0  # 0: None 1: gpt-3.5-turbo, 2: gpt-4-1106-preview, 3: Llama-2-7b-hf, 4: Llama-2-13b-hf, 5: Llama-2-70b-hf  (only need for inference with ICL)
+model_selection = 3  # 0: gpt-3.5-turbo, 1: gpt-4-1106-preview, 2: Llama-2-7b-hf, 3: Llama-2-13b-hf, 4: Llama-2-70b-hf
+
 
 f_SFT_TGLLM = True  # whether use SFT with TGLLM
-f_inference_ICL = False  # whether use inference with ICL
+f_inference_ICL = True  # whether use inference with ICL
+f_using_CoT = True  # whether use CoT
 f_ppl = False  # whether use perplexity
 
 ###########################
@@ -20,15 +22,15 @@ f_ppl = False  # whether use perplexity
 
 dataset_name = ['TGQA', 'TimeQA', 'TimeQA', 'TempReason', 'TempReason'][dataset_selection]
 split_name = ['', '_easy', '_hard', '_l2', '_l3'][dataset_selection]
-model_name = [None, 'gpt-3.5-turbo', 'gpt-4-1106-preview', 'Llama-2-7b-hf', 'Llama-2-13b-hf', 'Llama-2-70b-hf'][model_selection]
-
+model_name = ['gpt-3.5-turbo', 'gpt-4-1106-preview', 'Llama-2-7b-hf', 'Llama-2-13b-hf', 'Llama-2-70b-hf'][model_selection]
+learning_setting = 'SP' if not f_using_CoT else 'CoT'
 
 
 if f_SFT_TGLLM:
     folder_path = f'../results/{dataset_name}_TGR{split_name}'
+else:
+    folder_path = f'../results/{dataset_name}_ICL_{learning_setting}{split_name}_{model_name}' if f_inference_ICL else f'../results/{dataset_name}{split_name}_{model_name}'
 
-if f_inference_ICL:
-    folder_path = f'../results/{dataset_name}_ICL{split_name}_{model_name}'
 
 if f_ppl:
     folder_path += '_ppl'

@@ -42,7 +42,7 @@ f_unit_test = False  # whether to run the unit test (only for debugging)
 
 dataset_name = ['TGQA', 'TimeQA', 'TimeQA', 'TempReason', 'TempReason'][dataset_selection]
 split_name = ['', '_easy', '_hard', '_l2', '_l3'][dataset_selection]
-
+prefix = ['', 'easy_', 'hard_', 'l2_', 'l3_'][dataset_selection]
 
 
 
@@ -129,7 +129,7 @@ def read_data(dataset_name, prefix, split, f_CoT_bs=0, f_data_aug=0):
 
 
 
-prefix = ['', 'easy_', 'hard_', 'l2_', 'l3_'][dataset_selection]
+
 data_train = read_data(dataset_name, prefix, 'train', f_CoT_bs, f_data_aug)
 data_val = read_data(dataset_name, prefix, 'val', f_CoT_bs, f_data_aug)
 data_test = read_data(dataset_name, prefix, 'test')

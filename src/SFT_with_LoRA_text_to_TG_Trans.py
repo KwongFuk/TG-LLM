@@ -100,7 +100,7 @@ def my_generate_prompt(story, TG, entities, relation, times, mode=None, eos_toke
     times = ' , '.join(add_brackets(times)) if times is not None else None
 
     if f_shorten_story:
-        story = ' '.join(story.split(' ')[:1000])  # simply shorten the story to 1000 words
+        story = shorten_story(story)
 
     if relation is None:
         # If we do not have such information extracted from the questions, we will translate the whole story.
