@@ -20,10 +20,10 @@ os.environ["WANDB_DISABLED"] = "true"
 
 dataset_selection = 0  # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
 model_selection = 3  # 0: gpt-3.5-turbo, 1: gpt-4-1106-preview, 2: Llama-2-7b-hf, 3: Llama-2-13b-hf, 4: Llama-2-70b-hf
-f_using_CoT = 1  # whether use CoT
-f_ICL = 1   # whether use in-context learning during test
-f_rewrite = 1  # whether rewrite existing test results
-f_shorten_story = 1  # whether shorten the story
+f_using_CoT = True  # whether use CoT
+f_ICL = True   # whether use in-context learning during test
+f_rewrite = True  # whether rewrite existing test results
+f_shorten_story = True  # whether shorten the story
 f_print_example_prompt = True  # whether to print the example prompt for the model
 f_unit_test = False  # whether to run the unit test (only for debugging)
 

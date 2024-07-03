@@ -27,12 +27,12 @@ os.environ["WANDB_DISABLED"] = "true"
 ######### Config #########
 
 dataset_selection = 0   # 0: TGQA, 1: TimeQA, 2: TempReason
-f_train = 1  # whether train the model
-f_test = 1  # whether test the model
-f_ICL = 1   # whether use in-context learning during test
-f_rewrite = 1  # whether rewrite existing test results
-f_shorten_story = 1  # whether shorten the story
-f_hard_mode = 0   # whether use hard mode for translation (only know relations) v.s. easy mode (know entities, relations and times)
+f_train = True  # whether train the model
+f_test = True  # whether test the model
+f_ICL = True   # whether use in-context learning during test
+f_rewrite = True  # whether rewrite existing test results
+f_shorten_story = True  # whether shorten the story
+f_hard_mode = False   # whether use hard mode for translation (only know relations) v.s. easy mode (know entities, relations and times)
 f_print_example_prompt = True  # whether to print the example prompt for the model
 f_unit_test = False  # whether to run the unit test (only for debugging)
 

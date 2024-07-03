@@ -28,12 +28,12 @@ os.environ["WANDB_DISABLED"] = "true"
 ######### Config #########
 
 dataset_selection = 0  # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
-f_train = 1  # whether train the model
-f_test = 1  # whether test the model
-f_CoT_bs = 1  # whether use CoT bootstrapping
-f_data_aug = 1  # whether use data augmentation
-f_ICL = 1  # whether use in-context learning during test
-f_rewrite = 1  # whether rewrite existing test results
+f_train = True  # whether train the model
+f_test = True  # whether test the model
+f_CoT_bs = True  # whether use CoT bootstrapping
+f_data_aug = True  # whether use data augmentation
+f_ICL = True  # whether use in-context learning during test
+f_rewrite = True  # whether rewrite existing test results
 f_print_example_prompt = True  # whether to print the example prompt for the model
 f_unit_test = False  # whether to run the unit test (only for debugging)
 

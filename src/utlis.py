@@ -93,13 +93,14 @@ def process_CoT(ans_pred):
 
 def process_id(dataset_name, sample_id):
     '''
-    Process the sample id.
+    Process the sample id to obtain its story id.
     '''
-    story_id = sample_id
+    if dataset_name == 'TGQA':
+        story_id = sample_id.split('_')[0]
     if dataset_name == 'TimeQA':
-        story_id = story_id[:-2]
+        story_id = sample_id.split('_easy_')[0] if '_easy_' in sample_id else sample_id.split('_hard_')[0]
     if dataset_name == 'TempReason':
-        story_id = story_id[3:-2]
+        story_id = sample_id[3:-2]
     return story_id
 
 
@@ -403,3 +404,7 @@ def parse_TG_pred(pred):
             pred = pred.split(end_identifier)[0].strip()
         break
     return pred
+
+
+def replace_empty_answer_as_unknown(ans):
+    return [a if len(a)>0 else 'Unknown' for a in ans]
