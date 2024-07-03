@@ -6,41 +6,37 @@ import collections
 
 
 
+######### Config #########
 
-dataset_selection = 0 # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
-model_selection = 0  # only need for inference with ICL
+dataset_selection = 0  # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
+model_selection = 0  # 0: None 1: gpt-3.5-turbo, 2: gpt-4-1106-preview, 3: Llama-2-7b-hf, 4: Llama-2-13b-hf, 5: Llama-2-70b-hf  (only need for inference with ICL)
 
-dataset_name = ['TGQA', 'TimeQA_easy', 'TimeQA_hard', 'TempReason_l2', 'TempReason_l3'][dataset_selection]
-model_name = ['gpt-3.5-turbo', 'gpt-4-1106-preview', 'Llama-2-7b-hf', 'Llama-2-13b-hf', 'Llama-2-70b-hf'][model_selection]
+f_SFT_TGLLM = True  # whether use SFT with TGLLM
+f_inference_ICL = False  # whether use inference with ICL
+f_ppl = False  # whether use perplexity
+
+###########################
 
 
-f_SFT_TGLLM = 1 # whether use SFT with TGLLM
-f_inference_ICL = 0 # whether use inference with ICL
-f_ppl = 0 # whether use perplexity
+dataset_name = ['TGQA', 'TimeQA', 'TimeQA', 'TempReason', 'TempReason'][dataset_selection]
+split_name = ['', '_easy', '_hard', '_l2', '_l3'][dataset_selection]
+model_name = [None, 'gpt-3.5-turbo', 'gpt-4-1106-preview', 'Llama-2-7b-hf', 'Llama-2-13b-hf', 'Llama-2-70b-hf'][model_selection]
+
 
 
 if f_SFT_TGLLM:
-    folder_path = f'../results/{dataset_name}_TGSR'
+    folder_path = f'../results/{dataset_name}_TGR{split_name}'
 
 if f_inference_ICL:
-    folder_path = f'../results/{dataset_name}_ICL_{model_name}'
+    folder_path = f'../results/{dataset_name}_ICL{split_name}_{model_name}'
 
 if f_ppl:
     folder_path += '_ppl'
 
-num_question_cat = 1
-if dataset_name == 'TGQA':
-   num_question_cat = 9  # for TGQA, there are 9 question categories, and we use avarage of them to avoid imbalance problem
 
 
 
-EM_dict = {}
-f1_score_dict = {}
 
-
-for i in range(num_question_cat):
-    EM_dict[i] = [0, 0]
-    f1_score_dict[i] = []
 
 
 
@@ -99,6 +95,18 @@ def parse_generation(pred):
 
 
 
+EM_dict = {}
+f1_score_dict = {}
+
+
+num_question_cat = 1
+if dataset_name == 'TGQA':
+   num_question_cat = 9  # for TGQA, there are 9 question categories, and we use avarage of them to avoid imbalance problem
+
+for i in range(num_question_cat):
+    EM_dict[i] = [0, 0]
+    f1_score_dict[i] = []
+
 
 num_test_samples = 10000
 for i in range(num_test_samples):
@@ -112,7 +120,7 @@ for i in range(num_test_samples):
     pred = data['prediction'].strip()
     pred = parse_generation(pred)
 
-    gts = data['A']
+    gts = data['answer']
     gts = [gt[1:-1].strip() if gt[0] == '(' and gt[-1] == ')' else gt for gt in gts]
 
     if data['Q-Type'] is None:
@@ -123,25 +131,21 @@ for i in range(num_test_samples):
 
     cur_EM = [calculate_EM(pred, gt) for gt in gts]
     EM_dict[data['Q-Type']][0] += max(cur_EM)
-    EM_dict[data['Q-Type']][1] += max(cur_EM)
+    EM_dict[data['Q-Type']][1] += 1
 
 
-
-# for results based on perplexity, we only need EM since we select the answer from the candidates 
-print('EM:')
-
-
-
-EM_dict = []
 for i in range(num_question_cat):
     if EM_dict[i][1] > 0:
         EM_dict[i][0] = EM_dict[i][0]/EM_dict[i][1]
 
-    print(i, EM_dict[i])
-
-print(np.mean([EM_dict[i][0] for i in range(num_question_cat)]))
 
 
 
-print('\nF1 score:')
-print(np.mean([np.mean(f1_score_dict[i]) for i in range(num_question_cat)]))
+print('EM:')
+print(np.mean([EM_dict[i][0] for i in range(num_question_cat) if EM_dict[i][1] > 0]), sum(EM_dict[i][1] for i in range(num_question_cat)))
+
+
+# for results based on perplexity, we only need EM since we select the answer from the candidates
+if not f_ppl:
+    print('\nF1 score:')
+    print(np.mean([np.mean(f1_score_dict[i]) for i in range(num_question_cat) if len(f1_score_dict[i]) > 0]), sum(len(f1_score_dict[i]) for i in range(num_question_cat)))
