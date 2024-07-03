@@ -99,7 +99,7 @@ def process_id(dataset_name, sample_id):
     if dataset_name == 'TimeQA':
         story_id = story_id[:-2]
     if dataset_name == 'TempReason':
-        story_id = story_id[2:-2]
+        story_id = story_id[3:-2]
     return story_id
 
 
@@ -395,3 +395,11 @@ def shorten_story(story):
     Shorten the story.
     '''
     return ' '.join(story.split(' ')[:1000])  # simply shorten the story to 1000 words
+
+
+def parse_TG_pred(pred):
+    for end_identifier in ['Test:']:
+        if end_identifier in pred:
+            pred = pred.split(end_identifier)[0].strip()
+        break
+    return pred

@@ -18,7 +18,7 @@ from trl import SFTTrainer
 from peft import PeftModel
 from datasets import Dataset, load_dataset, concatenate_datasets
 from utlis import *
-
+from tqdm import tqdm
 
 os.environ["WANDB_DISABLED"] = "true"
 
@@ -158,8 +158,7 @@ if f_test:
         file_path = os.path.join(path_TG_pred, filename)
         with open(file_path) as json_file:
             data = json.load(json_file)
-        TG_pred[data['id']] = data['prediction']
-
+        TG_pred[data['id']] = parse_TG_pred(data['prediction'])
 
 
 
@@ -217,21 +216,22 @@ def my_generate_prompt(TG, EK, Q, CoT, A, Q_type=None, mode=None, eos_token=""):
 
 
 
-
-
 if f_print_example_prompt:
-    for i in range(5):
-        if f_train:
+    if f_train:
+        for i in range(5):
             sample = data_train[i]
             prompt = my_generate_prompt(sample['TG'], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer'], mode='train', eos_token="</s>")
+            print(prompt)
+            print('===============================')
 
-        if f_test:
+    if f_test:
+        for i in range(5):
             sample = data_test[i]
             story_id = process_id(dataset_name, sample['id'])
-            prompt = my_generate_prompt(TG_pred[story_id], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer'], Q_type=sample['Q-Type'], mode='test')
-
-        print(prompt)
-        print('===============================')
+            if story_id in TG_pred:
+                prompt = my_generate_prompt(TG_pred[story_id], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer'], Q_type=sample['Q-Type'], mode='test')
+                print(prompt)
+                print('===============================')
 
 
 
@@ -399,13 +399,15 @@ if f_test:
     input_prompts = []
     file_paths = []
     samples = []
-    for i in range(len(data_test)):
+    for i in tqdm(range(len(data_test))):
         file_path = folder_path + f'/{str(i)}.json'
         if os.path.exists(file_path) and (not f_rewrite):
             continue
 
         sample = data_test[i]
         story_id = process_id(dataset_name, sample['id'])
+        if story_id not in TG_pred:
+            continue
         cur_prompt = my_generate_prompt(TG_pred[story_id], sample['external knowledge'], sample['question'], None, None, Q_type=sample['Q-Type'], mode='test')
 
         input_prompts.append(cur_prompt)
