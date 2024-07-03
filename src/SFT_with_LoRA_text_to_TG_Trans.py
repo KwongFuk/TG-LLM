@@ -58,9 +58,6 @@ print(data_test)
 
 
 
-
-
-
 if f_print_example_prompt:
     for i in range(5):
         if f_train:
@@ -76,9 +73,6 @@ if f_print_example_prompt:
 
 
 
-
-
-
 model_name = "meta-llama/Llama-2-13b-hf"  # can be changed to other models
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -87,8 +81,6 @@ model = AutoModelForCausalLM.from_pretrained(model_name,
                                             load_in_8bit=True,
                                             device_map="auto"
                                             )
-
-
 
 
 

@@ -43,9 +43,6 @@ prefix = ['', 'easy_', 'hard_', 'l2_', 'l3_'][dataset_selection]
 
 
 
-
-
-
 def read_data(dataset_name, prefix, split, f_CoT_bs=0, f_data_aug=0):
     '''
     Read the data from the given file.
@@ -118,8 +115,6 @@ def read_data(dataset_name, prefix, split, f_CoT_bs=0, f_data_aug=0):
 
 
 
-
-
 data_train = read_data(dataset_name, prefix, 'train', f_CoT_bs, f_data_aug)
 data_val = read_data(dataset_name, prefix, 'val', f_CoT_bs, f_data_aug)
 data_test = read_data(dataset_name, prefix, 'test')
@@ -137,12 +132,9 @@ print(data_test)
 
 
 
-
 if f_test:
     # use estimated temporal graph for test
     TG_pred = obtain_TG_pred(dataset_name)
-
-
 
 
 if f_print_example_prompt:
@@ -164,9 +156,6 @@ if f_print_example_prompt:
 
 
 
-
-
-
 model_name = "meta-llama/Llama-2-13b-hf"  # you can change this to other models
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -175,11 +164,6 @@ model = AutoModelForCausalLM.from_pretrained(model_name,
                                             load_in_8bit=True,
                                             device_map="auto"
                                             )
-
-
-
-
-
 
 
 if f_train:

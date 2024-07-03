@@ -46,8 +46,6 @@ print(data_test)
 
 
 
-
-
 if f_print_example_prompt:
     for i in range(5):
         sample = data_test[i]
@@ -56,7 +54,6 @@ if f_print_example_prompt:
 
         print(prompt)
         print('===============================')
-
 
 
 
@@ -73,8 +70,6 @@ if 'Llama' in model_name:
                                                 device_map="auto"
                                                 )
     model.eval()
-
-
 
 
 

@@ -58,8 +58,6 @@ if f_print_example_prompt:
 
 
 
-
-
 model_name = "meta-llama/Llama-2-13b-hf" # you can change to other models
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
