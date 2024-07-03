@@ -301,6 +301,7 @@ if f_test:
         os.mkdir(folder_path)
 
     batch_size = 4
+    max_new_tokens = 1024 if dataset_name in 'TGQA' else 512  # Depends on the size of the (relevant) temporal graph
 
     input_prompts = []
     file_paths = []
@@ -319,11 +320,11 @@ if f_test:
 
         # collect the prompts as a batch
         if len(input_prompts) >= batch_size:
-            one_batch(peft_model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=1024)
+            one_batch(peft_model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=max_new_tokens)
             input_prompts = []
             file_paths = []
             samples_info = []
 
     # Last batch that is less than batch_size
     if len(input_prompts) > 0:
-        one_batch(peft_model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=1024)
+        one_batch(peft_model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=max_new_tokens)
