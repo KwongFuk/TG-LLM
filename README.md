@@ -75,6 +75,8 @@ cd src
 python Evaluation.py
 ```
 
+## Prompt Format
+We have changed the prompt format of our framework into **json** which is much eaiser to parse and doesn't hurt the peformance.
 
 ## Datasets
 
@@ -89,8 +91,6 @@ print(dataset) # Print dataset to see the statistics and available splits
 split = dataset['train']  # Multiple splits available: "train", "val", "test"
 ```
 
-## Prompt Format
-We have changed the prompt format of our framework into **json** which is much eaiser to parse and doesn't hurt the peformance.
 
 ## Contact
 If you have any inquiries, please feel free to raise an issue or reach out to sxiong45@gatech.edu.
