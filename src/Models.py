@@ -126,12 +126,14 @@ def run_one_batch_CoT_bs(model, tokenizer, input_prompts, samples):
         combinations = list(itertools.product(cur_sample['CoT'], neg_ans + cur_sample['answer']))
         cur_prompts = []
         context_len = []
-        for comb in combinations:
-            context = input_prompts[j] + process_CoT(comb[0])
-            cur_prompts.append(context + comb[1])
-            
+        for comb in combinations:            
+            context = input_prompts[j] + f'\n{{\n"Thought": {json.dumps(comb[0])},\n"Answer":'
+            final = context + f'{json.dumps([comb[1]])}\n}}'
+
             len_bf = tokenizer(context, return_tensors="pt")["input_ids"].shape[1]
-            len_af = tokenizer(context + comb[1], return_tensors="pt")["input_ids"].shape[1]
+            len_af = tokenizer(final, return_tensors="pt")["input_ids"].shape[1]
+            
+            cur_prompts.append(final)
             
             # The length of the context should be at least 1 less than the length of all the tokens
             context_len.append(min(len_bf, len_af-1))
@@ -142,10 +144,6 @@ def run_one_batch_CoT_bs(model, tokenizer, input_prompts, samples):
         loss_per_answer = loss_per_answer.reshape((len(cur_sample['CoT']), -1))
         logProbs_pos = np.mean(loss_per_answer[:, len(neg_ans):], axis=1)
         logProbs_neg = np.mean(loss_per_answer[:, :len(neg_ans)], axis=1)
-
-        # print("Loss per answer:", loss_per_answer)
-        # print("Log Probs Pos:", logProbs_pos)
-        # print("Log Probs Neg:", logProbs_neg)
 
         # Constrastive score:
         scores = logProbs_pos + gamma*(logProbs_pos - logProbs_neg)
@@ -158,7 +156,7 @@ def run_one_batch_CoT_bs(model, tokenizer, input_prompts, samples):
 
 
 
-def run_one_batch_ppl(model, tokenizer, input_prompts, samples, file_paths):
+def run_one_batch_ppl(model, tokenizer, input_prompts, samples, file_paths, using_json=True):
     '''
     Given a batch of input prompts and candidates, calculate the perplexity of the candidates and choose the best one. Then save the results to the corresponding files.
 
@@ -168,6 +166,7 @@ def run_one_batch_ppl(model, tokenizer, input_prompts, samples, file_paths):
     input_prompts: the input prompts
     samples: the samples
     file_paths: the file paths to save the results
+    using_json: whether to use json format
 
     Return:
     None
@@ -183,10 +182,14 @@ def run_one_batch_ppl(model, tokenizer, input_prompts, samples, file_paths):
         context_len = []
         for comb in combinations:
             context = comb[0]
-            cur_prompts.append(context + comb[1])
+            if using_json:
+                final = context + f'{json.dumps([comb[1]])}\n}}'
+            else:
+                final = context + comb[1]
+            cur_prompts.append(final)
             
             len_bf = tokenizer(context, return_tensors="pt")["input_ids"].shape[1]
-            len_af = tokenizer(context + comb[1], return_tensors="pt")["input_ids"].shape[1]
+            len_af = tokenizer(final, return_tensors="pt")["input_ids"].shape[1]
             
             # The length of the context should be at least 1 less than the length of all the tokens
             context_len.append(min(len_bf, len_af-1))
@@ -198,7 +201,6 @@ def run_one_batch_ppl(model, tokenizer, input_prompts, samples, file_paths):
 
         with open(file_paths[j], 'w') as json_file:
             json.dump(cur_sample, json_file)
-
 
     return
 

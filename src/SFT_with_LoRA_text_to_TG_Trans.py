@@ -24,7 +24,7 @@ f_train = True  # whether train the model
 f_test = True  # whether test the model
 f_ICL = True   # whether use in-context learning during test
 f_rewrite = True  # whether rewrite existing test results
-f_shorten_story = True  # whether shorten the story
+f_shorten_story = True  # whether shorten the story (For TimeQA and TempReason, it is possible that the story is too long to feed into the model)
 f_hard_mode = False   # whether use hard mode for translation (only know relations) v.s. easy mode (know entities, relations and times)
 f_print_example_prompt = True  # whether to print the example prompt for the model
 f_unit_test = False  # whether to run the unit test (only for debugging)
@@ -133,12 +133,13 @@ if f_test:
         samples.append(sample)
         file_paths.append(file_path)
 
+ 
         # collect the prompts as a batch
         if len(input_prompts) >= batch_size:
             run_one_batch_generation(peft_model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=max_new_tokens)
             input_prompts = []
             file_paths = []
-            samples_info = []
+            samples = []
 
     # Last batch that is less than batch_size
     if len(input_prompts) > 0:

@@ -3,7 +3,7 @@ import json
 import numpy as np
 from nltk.tokenize import word_tokenize
 import collections
-
+from utlis import *
 
 
 ######### Config #########
@@ -118,7 +118,16 @@ for i in range(num_test_samples):
         data = json.load(json_file)
 
     pred = data['prediction'].strip()
-    pred = parse_generation(pred)
+  
+    # For our framework, we use json format which is much more convenient for parsing.
+    if f_SFT_TGLLM:
+        if f_ppl:
+            pred = data['prediction']
+        else:
+            _, pred = parse_TGR_pred(pred)
+            pred = '' if pred is None else pred[0]
+    else:
+        pred = parse_generation(pred)
 
     gts = data['answer']
     gts = [gt[1:-1].strip() if gt[0] == '(' and gt[-1] == ')' else gt for gt in gts]

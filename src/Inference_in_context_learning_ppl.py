@@ -118,11 +118,11 @@ for i in tqdm(range(len(data_test))):
 
     # collect the prompts as a batch
     if len(input_prompts) >= batch_size:
-        run_one_batch_ppl(model, tokenizer, input_prompts, samples, file_paths)
+        run_one_batch_ppl(model, tokenizer, input_prompts, samples, file_paths, using_json=False)
         input_prompts = []
         file_paths = []
         samples = []
 
 
 if len(input_prompts) > 0:
-    run_one_batch_ppl(model, tokenizer, input_prompts, samples, file_paths)
+    run_one_batch_ppl(model, tokenizer, input_prompts, samples, file_paths, using_json=False)

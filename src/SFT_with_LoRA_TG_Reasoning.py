@@ -43,7 +43,7 @@ prefix = ['', 'easy_', 'hard_', 'l2_', 'l3_'][dataset_selection]
 
 
 
-def read_data(dataset_name, prefix, split, f_CoT_bs=0, f_data_aug=0):
+def read_data(dataset_name, prefix, split, f_CoT_bs=False, f_data_aug=False):
     '''
     Read the data from the given file.
 
@@ -123,7 +123,7 @@ data_test = read_data(dataset_name, prefix, 'test')
 if f_unit_test:
     data_train = create_subset(data_train, 10)
     data_val = create_subset(data_val, 10)
-    data_test = create_subset(data_test, 10)
+    data_test = create_subset(data_test, 100)
 
 
 print(data_train)
@@ -135,6 +135,7 @@ print(data_test)
 if f_test:
     # use estimated temporal graph for test
     TG_pred = obtain_TG_pred(dataset_name)
+
 
 
 if f_print_example_prompt:
@@ -150,7 +151,7 @@ if f_print_example_prompt:
             sample = data_test[i]
             story_id = process_id(dataset_name, sample['id'])
             if story_id in TG_pred:
-                prompt = my_generate_prompt_TG_Reasoning(dataset_name, split_name, TG_pred[story_id], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer'], f_ICL, Q_type=sample['Q-Type'], mode='test')
+                prompt = my_generate_prompt_TG_Reasoning(dataset_name, split_name, TG_pred[story_id], sample['external knowledge'], sample['question'], None, None, f_ICL, Q_type=sample['Q-Type'], mode='test')
                 print(prompt)
                 print('===============================')
 

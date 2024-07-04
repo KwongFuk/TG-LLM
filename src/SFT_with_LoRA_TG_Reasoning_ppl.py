@@ -41,7 +41,7 @@ data_test = dataset[f'{prefix}test']
 
 
 if f_unit_test:
-    data_test = create_subset(data_test, 10)
+    data_test = create_subset(data_test, 100)
 
 
 print(data_test)
@@ -56,7 +56,7 @@ if f_print_example_prompt:
         sample = data_test[i]
         story_id = process_id(dataset_name, sample['id'])
         if story_id in TG_pred:
-            prompt = my_generate_prompt_TG_Reasoning(dataset_name, split_name, TG_pred[story_id], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer'], f_ICL, Q_type=sample['Q-Type'], mode='test')
+            prompt = my_generate_prompt_TG_Reasoning(dataset_name, split_name, TG_pred[story_id], sample['external knowledge'], sample['question'], None, None, f_ICL, Q_type=sample['Q-Type'], mode='test')
             print(prompt)
             print('===============================')
 
@@ -114,7 +114,11 @@ for i in tqdm(range(len(data_test))):
     with open(file_path_past_res) as json_file:
         past_res = json.load(json_file)
 
-    cur_prompt += process_CoT(past_res['prediction'])
+    CoT, _ = parse_TGR_pred(past_res['prediction'])
+    if CoT is None:
+        continue
+
+    cur_prompt += f'\n{{\n"Thought": {json.dumps(CoT)},\n"Answer":'
 
     input_prompts.append(cur_prompt)
     samples.append(sample)

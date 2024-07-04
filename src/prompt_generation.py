@@ -14,15 +14,12 @@ def my_generate_prompt_CoT_bs(TG, EK, Q):
     Returns:
     prompt: string, the prompt for the model
     '''
-    TG = '\n'.join(TG)
-
-    prompt = f"Timeline:\n{TG}\n\nQuestion: {Q}"
+    prompt = f'Input:\n{{\n"Timeline":\n{json.dumps(TG)},\n"Question": {json.dumps(Q)},'
 
     if EK is not None:
-        EK = '\n'.join(EK)
-        prompt += f"\n\nUseful information:\n{EK}"
+        prompt += f'\n"Useful information":\n{json.dumps(EK)},'
 
-    prompt += "\n\nAnswer: Let's think step by step.\n\n"
+    prompt += '\n"Instruction": "Let\'s think step by step. Only return me json."\n}\nOutput:'
 
     return prompt
 
@@ -47,9 +44,6 @@ def my_generate_prompt_TG_Reasoning(dataset_name, split_name, TG, EK, Q, CoT, A,
     return:
         prompt: string, the prompt
     '''
-    if isinstance(TG, list):
-        TG = '\n'.join(TG)
-
     if f_ICL and mode == 'test':
         if dataset_name == 'TGQA':
             Q_type = f'Q{Q_type}'
@@ -61,22 +55,21 @@ def my_generate_prompt_TG_Reasoning(dataset_name, split_name, TG, EK, Q, CoT, A,
         with open(file_path) as txt_file:
             prompt_examples = txt_file.read()
 
+  
     if f_ICL and mode == 'test':
-        prompt = f"Example:\n\n{prompt_examples}\n\nTest:\n\nTimeline:\n{TG}\n\nQuestion: {Q}"
+        prompt = f'Example:\n\n{prompt_examples}\n\nTest:\n\nInput:\n{{\n"Timeline":\n{json.dumps(TG)},\n"Question": {json.dumps(Q)},'
     else:
-        prompt = f"Timeline:\n{TG}\n\nQuestion: {Q}"
+        prompt = f'Input:\n{{\n"Timeline":\n{json.dumps(TG)},\n"Question": {json.dumps(Q)},'
 
     if EK is not None:
-        if isinstance(EK, list):
-            EK = '\n'.join(EK)
-        prompt += f"\n\nUseful information:\n{EK}"
+        prompt += f'\n"Useful information":\n{json.dumps(EK)},'
 
-    prompt += "\n\nAnswer: Let's think step by step.\n\n"
+    prompt += '\n"Instruction": "Let\'s think step by step. Only return me json."\n}\nOutput:'
 
-    if CoT is not None:
+    if CoT is not None and A is not None:
         if isinstance(CoT, list):
             CoT = CoT[0]
-        prompt += CoT
+        prompt += f'\n{{\n"Thought": {json.dumps(CoT)},\n"Answer": {json.dumps(A)}\n}}'
 
     prompt += eos_token
     return prompt
@@ -158,22 +151,19 @@ def my_generate_prompt_TG_trans(dataset_name, story, TG, entities, relation, tim
 
     if relation is None:
         # If we do not have such information extracted from the questions, we will translate the whole story.
-        prompt = add_examples_in_prompt(f"{story}\n\nSummary all the events as a timeline.\n\nTimeline:")
+        prompt = add_examples_in_prompt(f'Input:\n{{\n"Story": {json.dumps(story)},\n"Instruction": "Summary all the events as a timeline. Only return me json."\n}}\nOutput:\n')
     else:
         if f_hard_mode or entities is None or times is None:
-            prompt = add_examples_in_prompt(f"{story}\n\nSummary {relation} as a timeline.\n\nTimeline:")
+            prompt = add_examples_in_prompt(f'Input:\n{{\n"Story": {json.dumps(story)},\n"Instruction": "Summary {relation} as a timeline. Only return me json."\n}}\nOutput:\n')
         else:
-            prompt = add_examples_in_prompt(f"{story}\n\nGiven the time periods: {times}, summary {relation} as a timeline. Choose from {entities}.\n\nTimeline:")
-
+            prompt = add_examples_in_prompt(f'Input:\n{{\n"Story": {json.dumps(story)},\n"Instruction": "Given the time periods: {times}, summary {relation} as a timeline. Choose from {entities}. Only return me json."\n}}\nOutput:\n')
+             
     # For training data, we provide the TG as label.
     if TG is not None:
-        # Convert the list to string
-        TG = '\n'.join(TG)
-
         # If we want to test the transfer learning performance, we can change the format of the TG in TGQA to other datasets.
         TG = TG_formating_change(TG, dataset_name, transferred_dataset_name)
 
-        prompt += f"\n{TG}\n"
+        prompt += f'\n{{\n"Timeline":\n{json.dumps(TG)}\n}}'
 
     prompt += eos_token
     return prompt

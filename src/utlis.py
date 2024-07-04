@@ -29,7 +29,7 @@ def TG_formating_change(TG, dataset_name, targ_dataset):
     To test transfer learning performance, change the format of the TG from TGQA to other datasets.
 
     Args:
-    - TG: str, the TG
+    - TG: list of strings, the temporal graph
     - dataset_name: str, the ori dataset
     - targ_dataset: str, the target dataset
 
@@ -45,7 +45,7 @@ def TG_formating_change(TG, dataset_name, targ_dataset):
     timeline = []
     eventline = []
     cnt = 0
-    for line in TG.split('\n'):
+    for line in TG:
         if not len(line.strip()):
             continue
         if 'starts at' in line:
@@ -77,8 +77,7 @@ def TG_formating_change(TG, dataset_name, targ_dataset):
             TG.append(f'{time} : {event}')
         else:
             TG.append(f'{event[1:-1]} {time}.')
-    TG = '\n'.join(TG)
-    
+
     return TG
 
 
@@ -394,19 +393,22 @@ def create_subset(dataset, size, shuffle=False, seed=None):
     return subset
 
 
-def shorten_story(story):
+def shorten_story(story, max_len=1500):
     '''
-    Shorten the story.
+    Shorten the story to reduce memory cost.
     '''
-    return ' '.join(story.split(' ')[:1000])  # simply shorten the story to 1000 words
+    return ' '.join(story.split(' ')[:max_len])  # simply shorten the story to the first max_len words 
 
 
 def parse_TG_pred(pred):
-    for end_identifier in ['Test:']:
-        if end_identifier in pred:
-            pred = pred.split(end_identifier)[0].strip()
-        break
-    return pred
+    try:
+        res = eval('{' + pred.split('{')[1].split('}')[0] + '}')
+        return res['Timeline']
+    except:
+        pass
+    
+    return None
+
 
 
 def replace_empty_answer_as_unknown(ans):
@@ -429,5 +431,17 @@ def obtain_TG_pred(dataset_name):
         file_path = os.path.join(path_TG_pred, filename)
         with open(file_path) as json_file:
             data = json.load(json_file)
-        TG_pred[data['id']] = parse_TG_pred(data['prediction'])
+        parsed_res = parse_TG_pred(data['prediction'])
+        if parsed_res is not None:
+            TG_pred[data['id']] = parsed_res
     return TG_pred
+
+
+def parse_TGR_pred(pred):
+    try:
+        res = eval('{' + pred.split('{')[1].split('}')[0] + '}')
+        return res['Thought'], res['Answer']
+    except:
+        pass
+    
+    return None, None
