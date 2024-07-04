@@ -2,7 +2,7 @@
 
 This repository contains the code for the paper [Large Language Models Can Learn Temporal Reasoning](https://arxiv.org/pdf/2401.06853.pdf).
 
-Our framework (TG-LLM) performs temporal reasoning in two steps: 1) Text-to-Temporal Graph translation: generate (relevant) temporal graph given the context and keyword (extracted from questions); 2) Temporal Graph Reasoning: perform Chain-of-Thought reasoning over the temporal graph.
+Our framework (TG-LLM) performs **temporal reasoning** in two steps: 1) **Text-to-Temporal Graph translation:** generate (relevant) temporal graph given the context and keyword (extracted from questions); 2) **Temporal Graph Reasoning:** perform Chain-of-Thought reasoning over the temporal graph.
 
 <br>
 
@@ -88,6 +88,9 @@ dataset = load_dataset("sxiong/TGQA", "TGQA_Story_TG_Trans") # Six configs avail
 print(dataset) # Print dataset to see the statistics and available splits
 split = dataset['train']  # Multiple splits available: "train", "val", "test"
 ```
+
+## Prompt Format
+We have changed the prompt format of our framework into **json** which is much eaiser to parse and doesn't hurt the peformance.
 
 ## Contact
 If you have any inquiries, please feel free to raise an issue or reach out to sxiong45@gatech.edu.
