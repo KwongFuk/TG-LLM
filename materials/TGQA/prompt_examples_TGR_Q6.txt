@@ -25,6 +25,6 @@ Input:
 }
 Output:
 {
-    "Thought": "To solve this problem, we need to compare the start and end dates of the two events in question:\n\n(Emily Cooper was married to Jack Thompson) ends at 1989\n(Emily Cooper died in Wanderers) starts at 2011\n\nSince 1989 is before 2011.",
+    "Thought": """To solve this problem, we need to compare the start and end dates of the two events in question:\n\n(Emily Cooper was married to Jack Thompson) ends at 1989\n(Emily Cooper died in Wanderers) starts at 2011\n\nSince 1989 is before 2011.""",
     "Answer": ["False"]
 }

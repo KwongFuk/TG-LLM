@@ -127,7 +127,7 @@ def run_one_batch_CoT_bs(model, tokenizer, input_prompts, samples):
         cur_prompts = []
         context_len = []
         for comb in combinations:            
-            context = input_prompts[j] + f'\n{{\n"Thought": {json.dumps(comb[0])},\n"Answer":'
+            context = input_prompts[j] + f'\n{{\n"Thought": ""{json.dumps(comb[0])}"",\n"Answer":'
             final = context + f'{json.dumps([comb[1]])}\n}}'
 
             len_bf = tokenizer(context, return_tensors="pt")["input_ids"].shape[1]

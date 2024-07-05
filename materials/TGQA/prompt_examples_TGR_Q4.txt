@@ -19,6 +19,6 @@ Input:
 }
 Output:
 {
-    "Thought": "To solve this problem, we need to identify the specific event in question from the list and then determine the starting year of that event. The event we're looking for is (Adam Campbell died in Oceanview) start .\n\nIn the information provided:\n(Adam Campbell died in Oceanview) starts at 2009",
+    "Thought": """To solve this problem, we need to identify the specific event in question from the list and then determine the starting year of that event. The event we're looking for is (Adam Campbell died in Oceanview) start .\n\nIn the information provided:\n(Adam Campbell died in Oceanview) starts at 2009""",
     "Answer": ["2009"]
 }

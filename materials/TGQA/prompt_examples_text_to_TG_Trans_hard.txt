@@ -6,8 +6,8 @@ Input:
 }
 Output:
 {
-    "Timeline":
-        ["(Chris Evans was born in Bristol, Connecticut) starts at 1948",
+    "Timeline": [
+        "(Chris Evans was born in Bristol, Connecticut) starts at 1948",
         "(Oliver Jensen was born in Bristol, Connecticut) starts at 1948",
         "(Chris Evans was married to Oliver Jensen) starts at 1970",
         "(Oliver Jensen was married to Chris Evans) starts at 1970",
@@ -15,7 +15,8 @@ Output:
         "(Chris Evans won prize Victory Achievement Award) starts at 2007",
         "(Chris Evans was married to Oliver Jensen) ends at 2010",
         "(Oliver Jensen was married to Chris Evans) ends at 2010",
-        "(Chris Evans owned Pearl Network) ends at 2013"]
+        "(Chris Evans owned Pearl Network) ends at 2013"
+    ]
 }
 
 
@@ -27,8 +28,8 @@ Input:
 }
 Output:
 {
-    "Timeline":
-        ["(Paul Anderson was born in Austin) starts at 1983",
+    "Timeline": [
+        "(Paul Anderson was born in Austin) starts at 1983",
         "(Paul Anderson played for Northern Rovers F.C.) starts at 1993",
         "(Paul Anderson played for Blazing Tigers (Hartford)) starts at 1995",
         "(Paul Anderson played for Northern Rovers F.C.) ends at 1995",
@@ -45,5 +46,6 @@ Output:
         "(Paul Anderson played for Ocean City Football Club) ends at 2005",
         "(Paul Anderson played for Oliverstown United) ends at 2007",
         "(Paul Anderson played for Greenfield United (Chicago)) starts at 2011",
-        "(Paul Anderson played for Greenfield United (Chicago)) ends at 2013"]
+        "(Paul Anderson played for Greenfield United (Chicago)) ends at 2013"
+    ]
 }

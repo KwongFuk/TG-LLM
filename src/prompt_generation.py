@@ -69,7 +69,7 @@ def my_generate_prompt_TG_Reasoning(dataset_name, split_name, TG, EK, Q, CoT, A,
     if CoT is not None and A is not None:
         if isinstance(CoT, list):
             CoT = CoT[0]
-        prompt += f'\n{{\n"Thought": {json.dumps(CoT)},\n"Answer": {json.dumps(A)}\n}}'
+        prompt += f'\n{{\n"Thought": ""{json.dumps(CoT)}"",\n"Answer": {json.dumps(A)}\n}}'
 
     prompt += eos_token
     return prompt
