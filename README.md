@@ -42,37 +42,53 @@ Preparation
 cd TG-LLM
 mkdir model_weights
 mkdir results
+cd src
 ```
 
-For our TG-LLM framework
+For our TG-LLM framework:
+
+- Step 1: text-to-temporal graph translation
 
 ```sh
-cd src
-
-# step 1: text-to-temporal graph translation
-python SFT_with_LoRA_text_to_TG_Trans.py
-
-# step 2: temporal graph reasoning
-python CoT_bootstrap.py
-python SFT_with_LoRA_TG_Reasoning.py
-
-# to obtain results based on perplexity
-python SFT_with_LoRA_TG_Reasoning_ppl.py
+# Train and test on TGQA dataset
+python SFT_with_LoRA_text_to_TG_Trans.py --dataset TGQA --train --print_prompt
+python SFT_with_LoRA_text_to_TG_Trans.py --dataset TGQA --test --ICL --rewrite --print_prompt
+```
+```sh
+# Train on TGQA, test on TimeQA
+python SFT_with_LoRA_text_to_TG_Trans.py --dataset TGQA --train --transferred_dataset TimeQA --print_prompt
+python SFT_with_LoRA_text_to_TG_Trans.py --dataset TimeQA --test --shorten_story --ICL --rewrite --print_prompt
 ```
 
-For other leading LLMs (GPT series/Llama2 family)
-```sh
-cd src
-python Inference_in_context_learning.py
+- Step 2: temporal graph reasoning
 
-# to obtain results based on perplexity
-python Inference_in_context_learning_ppl.py
+```sh
+# Obtain CoT sampling prob
+python CoT_bootstrap.py --dataset TGQA --print_prompt
+```
+```sh
+# Train and test on TGQA dataset
+python SFT_with_LoRA_TG_Reasoning.py --dataset TGQA --train --CoT_bs --data_aug --print_prompt
+python SFT_with_LoRA_TG_Reasoning.py --dataset TGQA --test --ICL --rewrite --print_prompt
+```
+```sh
+# to obtain inference results based on perplexity
+python SFT_with_LoRA_TG_Reasoning_ppl.py --dataset TGQA --ICL --rewrite --print_prompt
 ```
 
-For evaluation
+For other leading LLMs (GPT series/Llama2 family):
 ```sh
-cd src
-python Evaluation.py
+# Test on TGQA with Llama2-13b
+python Inference_in_context_learning.py --dataset TGQA --model Llama2-13b --CoT --ICL --rewrite --print_prompt
+
+# to obtain inference results based on perplexity
+python Inference_in_context_learning_ppl.py --dataset TGQA --model Llama2-13b --CoT --ICL --rewrite --print_prompt
+```
+
+For evaluation:
+```sh
+python Evaluation.py --dataset TGQA --model Llama2-13b --TGLLM
+python Evaluation.py --dataset TGQA --model Llama2-13b --ICL_only --CoT
 ```
 
 ## Prompt Format
