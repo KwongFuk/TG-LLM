@@ -57,7 +57,7 @@ python SFT_with_LoRA_text_to_TG_Trans.py --dataset TGQA --test --ICL --rewrite -
 ```sh
 # Train on TGQA, test on TimeQA
 python SFT_with_LoRA_text_to_TG_Trans.py --dataset TGQA --train --transferred_dataset TimeQA --print_prompt
-python SFT_with_LoRA_text_to_TG_Trans.py --dataset TimeQA --test --shorten_story --ICL --rewrite --print_prompt
+python SFT_with_LoRA_text_to_TG_Trans.py --dataset TimeQA --test --shorten_story --ICL --rewrite --print_prompt --transferred
 ```
 
 - Step 2: temporal graph reasoning
