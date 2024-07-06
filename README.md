@@ -78,7 +78,7 @@ python SFT_with_LoRA_TG_Reasoning_ppl.py --dataset TGQA --ICL --rewrite --print_
 
 For other leading LLMs (GPT series/Llama2 family):
 ```sh
-# Test on TGQA with Llama2-13b
+# Test on TGQA with Llama2-13b with ICL only
 python Inference_in_context_learning.py --dataset TGQA --model Llama2-13b --CoT --ICL --rewrite --print_prompt
 
 # to obtain inference results based on perplexity
@@ -87,7 +87,10 @@ python Inference_in_context_learning_ppl.py --dataset TGQA --model Llama2-13b --
 
 For evaluation:
 ```sh
+# to evaluate our framework
 python Evaluation.py --dataset TGQA --model Llama2-13b --TGLLM
+
+# to evaluate other leading LLMs with ICL only
 python Evaluation.py --dataset TGQA --model Llama2-13b --ICL_only --CoT
 ```
 
