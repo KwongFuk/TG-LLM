@@ -22,7 +22,7 @@ parser.add_argument('--ICL', action='store_true')
 parser.add_argument('--rewrite', action='store_true')
 parser.add_argument('--print_prompt', action='store_true')
 parser.add_argument('--unit_test', action='store_true')
-
+parser.add_argument('--transferred', action='store_true')
 
 args = parser.parse_args()
 
@@ -35,6 +35,7 @@ f_ICL = args.ICL   # whether use in-context learning during test
 f_rewrite = args.rewrite   # whether rewrite existing test results
 f_print_example_prompt = args.print_prompt   # whether to print the example prompt for the model
 f_unit_test = args.unit_test   # whether to run the unit test (only for debugging)
+f_transferred = args.transferred  # whether to use the TG results from transfer learning
 
 ###########################
 
@@ -59,7 +60,7 @@ print(data_test)
 
 
 # use estimated temporal graph for test
-TG_pred = obtain_TG_pred(dataset_name)
+TG_pred = obtain_TG_pred(dataset_name, f_transferred)
 
 
 if f_print_example_prompt:

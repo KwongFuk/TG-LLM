@@ -28,6 +28,7 @@ parser.add_argument('--hard_mode', action='store_true')
 parser.add_argument('--print_prompt', action='store_true')
 parser.add_argument('--unit_test', action='store_true')
 parser.add_argument('--transferred_dataset', type=str)
+parser.add_argument('--transferred', action='store_true')
 
 args = parser.parse_args()
 
@@ -48,6 +49,7 @@ f_unit_test = args.unit_test   # whether to run the unit test (only for debuggin
 # If we want to test the transfer learning performance, just change the transferred dataset name.
 # Note: current dataset_name should be 'TGQA', transferred_dataset_name = None (no transfer learning)
 transferred_dataset_name = args.transferred_dataset
+f_transferred = args.transferred  # whether to use transfer learning during test (if True, we will read the model weights learned from the transferred dataset)
 
 ###########################
 
@@ -112,19 +114,25 @@ if f_train:
         return output
 
     output_dir = f"../model_weights/{dataset_name}_story_TG_trans"
+    if transferred_dataset_name is not None:
+        output_dir = f"../model_weights/{dataset_name}_to_{transferred_dataset_name}_story_TG_trans"
     SFT_with_LoRA(model, tokenizer, output_dir, f_unit_test, formatting_func, data_train, data_val, 4, 4096)
 
 
-if f_test: 
+if f_test:
     # we need padding on the left side to create the embeddings for a whole batch
     tokenizer.pad_token_id = 0
     tokenizer.padding_side = 'left'
 
     peft_model_id = f"../model_weights/{dataset_name}_story_TG_trans/final"
+    if f_transferred:
+        peft_model_id = f"../model_weights/TGQA_to_{dataset_name}_story_TG_trans/final"
     peft_model = PeftModel.from_pretrained(model, peft_model_id, torch_dtype=torch.float16, offload_folder="lora_results/lora_7/temp")
     peft_model.eval()  # Set the model to evaluation mode
 
     folder_path = f'../results/{dataset_name}_story_TG_trans'
+    if f_transferred:
+        folder_path = f'../results/TGQA_to_{dataset_name}_story_TG_trans'
     if not os.path.exists(folder_path):
         os.mkdir(folder_path)
 
