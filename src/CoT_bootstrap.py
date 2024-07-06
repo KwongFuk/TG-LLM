@@ -1,19 +1,27 @@
 import sys
 import json
 import os
-
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
 from utlis import *
 from Models import *
 from tqdm import tqdm
 from prompt_generation import *
+import argparse
 
 os.environ["WANDB_DISABLED"] = "true"
 
 
 
+parser = argparse.ArgumentParser()
 
+
+parser.add_argument('--dataset', type=str)
+parser.add_argument('--print_prompt', action='store_true')
+parser.add_argument('--unit_test', action='store_true')
+
+
+args = parser.parse_args()
 
 
 
@@ -21,9 +29,9 @@ os.environ["WANDB_DISABLED"] = "true"
 
 ######### Config #########
 
-dataset_selection = 0   # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
-f_print_example_prompt = True  # whether to print the example prompt for the model
-f_unit_test = False  # whether to run the unit test (only for debugging)
+dataset_selection = ['TGQA', 'TimeQA_easy', 'TimeQA_hard', 'TempReason_l2', 'TempReason_l3'].index(args.dataset)
+f_print_example_prompt = args.print_prompt   # whether to print the example prompt for the model
+f_unit_test = args.unit_test   # whether to run the unit test (only for debugging)
 
 ###########################
 

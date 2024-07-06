@@ -3,9 +3,6 @@ import json
 import random
 import os
 import copy
-
-
-
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
@@ -14,25 +11,44 @@ from utlis import *
 from tqdm import tqdm
 from Models import *
 from prompt_generation import *
+import argparse
 
 os.environ["WANDB_DISABLED"] = "true"
 
 
 
+parser = argparse.ArgumentParser()
+
+
+parser.add_argument('--dataset', type=str)
+parser.add_argument('--train', action='store_true')
+parser.add_argument('--test', action='store_true')
+parser.add_argument('--CoT_bs', action='store_true')
+parser.add_argument('--data_aug', action='store_true')
+parser.add_argument('--ICL', action='store_true')
+parser.add_argument('--rewrite', action='store_true')
+parser.add_argument('--print_prompt', action='store_true')
+parser.add_argument('--unit_test', action='store_true')
+
+
+args = parser.parse_args()
+
+
 
 ######### Config #########
 
-dataset_selection = 0  # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
-f_train = True  # whether train the model
-f_test = True  # whether test the model
-f_CoT_bs = True  # whether use CoT bootstrapping
-f_data_aug = True  # whether use data augmentation
-f_ICL = True  # whether use in-context learning during test
-f_rewrite = True  # whether rewrite existing test results
-f_print_example_prompt = True  # whether to print the example prompt for the model
-f_unit_test = False  # whether to run the unit test (only for debugging)
+dataset_selection = ['TGQA', 'TimeQA_easy', 'TimeQA_hard', 'TempReason_l2', 'TempReason_l3'].index(args.dataset)
+f_train = args.train   # whether train the model
+f_test = args.test   # whether test the model
+f_CoT_bs = args.CoT_bs   # whether use CoT bootstrapping
+f_data_aug = args.data_aug   # whether use data augmentation
+f_ICL = args.ICL   # whether use in-context learning during test
+f_rewrite = args.rewrite   # whether rewrite existing test results
+f_print_example_prompt = args.print_prompt   # whether to print the example prompt for the model
+f_unit_test = args.unit_test   # whether to run the unit test (only for debugging)
 
 ###########################
+
 
 
 dataset_name = ['TGQA', 'TimeQA', 'TimeQA', 'TempReason', 'TempReason'][dataset_selection]

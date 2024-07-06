@@ -1,31 +1,45 @@
 import sys
 import json
 import os
-
-
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
 from utlis import *
 from tqdm import tqdm
 from Models import *
 from prompt_generation import *
-
+import argparse
 
 os.environ["WANDB_DISABLED"] = "true"
 
 
 
+parser = argparse.ArgumentParser()
+
+
+parser.add_argument('--dataset', type=str)
+parser.add_argument('--model', type=str)
+parser.add_argument('--CoT', action='store_true')
+parser.add_argument('--ICL', action='store_true')
+parser.add_argument('--rewrite', action='store_true')
+parser.add_argument('--shorten_story', action='store_true')
+parser.add_argument('--print_prompt', action='store_true')
+parser.add_argument('--unit_test', action='store_true')
+
+
+args = parser.parse_args()
+
+
 
 ######### Config #########
 
-dataset_selection = 0   # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
-model_selection = 1  # 0: Llama-2-7b-hf, 1: Llama-2-13b-hf, 2: Llama-2-70b-hf
-f_using_CoT = True  # whether use CoT
-f_ICL = True   # whether use in-context learning during test
-f_rewrite = True  # whether rewrite existing test results
-f_shorten_story = True  # whether shorten the story
-f_print_example_prompt = True  # whether to print the example prompt for the model
-f_unit_test = False  # whether to run the unit test (only for debugging)
+dataset_selection = ['TGQA', 'TimeQA_easy', 'TimeQA_hard', 'TempReason_l2', 'TempReason_l3'].index(args.dataset)
+model_selection = ['Llama2-7b', 'Llama2-13b', 'Llama2-70b'].index(args.model)
+f_using_CoT = args.CoT  # whether use CoT
+f_ICL = args.ICL   # whether use in-context learning during test
+f_rewrite = args.rewrite   # whether rewrite existing test results
+f_shorten_story = args.shorten_story   # whether shorten the story (For TimeQA and TempReason, it is possible that the story is too long to feed into the model)
+f_print_example_prompt = args.print_prompt  # whether to print the example prompt for the model
+f_unit_test = args.unit_test   # whether to run the unit test (only for debugging)
 
 ###########################
 

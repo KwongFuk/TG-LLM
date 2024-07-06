@@ -4,18 +4,34 @@ import numpy as np
 from nltk.tokenize import word_tokenize
 import collections
 from utlis import *
+import argparse
+
+
+
+parser = argparse.ArgumentParser()
+
+
+parser.add_argument('--dataset', type=str)
+parser.add_argument('--model', type=str)
+parser.add_argument('--TGLLM', action='store_true')
+parser.add_argument('--ICL_only', action='store_true')
+parser.add_argument('--CoT', action='store_true')
+parser.add_argument('--ppl', action='store_true')
+
+
+args = parser.parse_args()
+
 
 
 ######### Config #########
 
-dataset_selection = 0  # 0: TGQA, 1: TimeQA_easy, 2: TimeQA_hard, 3: TempReason_l2, 4: TempReason_l3
-model_selection = 3  # 0: gpt-3.5-turbo, 1: gpt-4-1106-preview, 2: Llama-2-7b-hf, 3: Llama-2-13b-hf, 4: Llama-2-70b-hf
+dataset_selection = ['TGQA', 'TimeQA_easy', 'TimeQA_hard', 'TempReason_l2', 'TempReason_l3'].index(args.dataset)
+model_selection = ['gpt-3.5', 'gpt-4', 'Llama2-7b', 'Llama2-13b', 'Llama2-70b'].index(args.model)
 
-
-f_SFT_TGLLM = True  # whether use SFT with TGLLM
-f_inference_ICL = True  # whether use inference with ICL
-f_using_CoT = True  # whether use CoT
-f_ppl = False  # whether use perplexity
+f_SFT_TGLLM = args.TGLLM   # whether use SFT with TGLLM
+f_inference_ICL = args.ICL_only   # whether use inference with ICL only
+f_using_CoT = args.CoT   # whether use CoT
+f_ppl = args.ppl   # whether use perplexity
 
 ###########################
 

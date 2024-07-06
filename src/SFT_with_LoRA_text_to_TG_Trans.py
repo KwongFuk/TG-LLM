@@ -8,36 +8,50 @@ from tqdm import tqdm
 from utlis import *
 from Models import *
 from prompt_generation import *
+import argparse
 
 os.environ["WANDB_DISABLED"] = "true"
 
 
 
 
+parser = argparse.ArgumentParser()
+
+
+parser.add_argument('--dataset', type=str)
+parser.add_argument('--train', action='store_true')
+parser.add_argument('--test', action='store_true')
+parser.add_argument('--rewrite', action='store_true')
+parser.add_argument('--ICL', action='store_true')
+parser.add_argument('--shorten_story', action='store_true')
+parser.add_argument('--hard_mode', action='store_true')
+parser.add_argument('--print_prompt', action='store_true')
+parser.add_argument('--unit_test', action='store_true')
+parser.add_argument('--transferred_dataset', type=str)
+
+args = parser.parse_args()
 
 
 
 ######### Config #########
 
-dataset_selection = 0   # 0: TGQA, 1: TimeQA, 2: TempReason
-f_train = True  # whether train the model
-f_test = True  # whether test the model
-f_ICL = True   # whether use in-context learning during test
-f_rewrite = True  # whether rewrite existing test results
-f_shorten_story = True  # whether shorten the story (For TimeQA and TempReason, it is possible that the story is too long to feed into the model)
-f_hard_mode = False   # whether use hard mode for translation (only know relations) v.s. easy mode (know entities, relations and times)
-f_print_example_prompt = True  # whether to print the example prompt for the model
-f_unit_test = False  # whether to run the unit test (only for debugging)
+dataset_name = args.dataset   # 'TGQA', 'TimeQA', 'TempReason'
+f_train = args.train   # whether train the model
+f_test = args.test  # whether test the model
+f_rewrite = args.rewrite  # whether rewrite existing test results
+f_ICL = args.ICL  # whether use in-context learning during test
+f_shorten_story = args.shorten_story   # whether shorten the story (For TimeQA and TempReason, it is possible that the story is too long to feed into the model)
+f_hard_mode = args.hard_mode   # whether use hard mode (only know relations) v.s. easy mode (know entities, relations and times) for translation
+f_print_example_prompt = args.print_prompt  # whether to print the example prompt for the model
+f_unit_test = args.unit_test   # whether to run the unit test (only for debugging)
 
 # If we want to test the transfer learning performance, just change the transferred dataset name.
 # Note: current dataset_name should be 'TGQA', transferred_dataset_name = None (no transfer learning)
-transferred_dataset_name = [None, 'TimeQA', 'TempReason'][0]  
+transferred_dataset_name = args.transferred_dataset
 
 ###########################
 
 
-
-dataset_name = ['TGQA', 'TimeQA', 'TempReason'][dataset_selection]
 dataset = load_dataset("sxiong/TGQA", f'{dataset_name}_Story_TG_Trans')
 
 
