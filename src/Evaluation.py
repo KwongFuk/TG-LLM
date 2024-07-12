@@ -13,7 +13,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--dataset', type=str)
 parser.add_argument('--model', type=str)
-parser.add_argument('--TGLLM', action='store_true')
+parser.add_argument('--SFT', action='store_true')
 parser.add_argument('--ICL_only', action='store_true')
 parser.add_argument('--CoT', action='store_true')
 parser.add_argument('--ppl', action='store_true')
@@ -28,7 +28,7 @@ args = parser.parse_args()
 dataset_selection = ['TGQA', 'TimeQA_easy', 'TimeQA_hard', 'TempReason_l2', 'TempReason_l3'].index(args.dataset)
 model_selection = ['gpt-3.5', 'gpt-4', 'Llama2-7b', 'Llama2-13b', 'Llama2-70b'].index(args.model)
 
-f_SFT_TGLLM = args.TGLLM   # whether use SFT with TGLLM
+f_SFT = args.SFT   # whether use SFT
 f_inference_ICL = args.ICL_only   # whether use inference with ICL only
 f_using_CoT = args.CoT   # whether use CoT
 f_ppl = args.ppl   # whether use perplexity
@@ -43,7 +43,7 @@ model_name = ['gpt-3.5-turbo', 'gpt-4-1106-preview', 'Llama-2-7b-hf', 'Llama-2-1
 learning_setting = 'SP' if not f_using_CoT else 'CoT'
 
 
-if f_SFT_TGLLM:
+if f_SFT:
     strategy = 'TGR' if not f_no_TG else 'storyR'
     folder_path = f'../results/{dataset_name}_{strategy}{split_name}'
 else:
@@ -138,7 +138,7 @@ for i in range(num_test_samples):
     pred = data['prediction'].strip()
   
     # For our framework, we use json format which is much more convenient for parsing.
-    if f_SFT_TGLLM:
+    if f_SFT:
         if f_ppl:
             pred = data['prediction']
         else:
