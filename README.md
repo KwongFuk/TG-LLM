@@ -55,7 +55,6 @@ cd src
 python SFT_with_LoRA_text_to_TG_Trans.py --dataset TGQA --train --print_prompt
 python SFT_with_LoRA_text_to_TG_Trans.py --dataset TGQA --test --ICL --rewrite --print_prompt
 
-
 # Train on TGQA, test on TimeQA
 python SFT_with_LoRA_text_to_TG_Trans.py --dataset TGQA --train --transferred_dataset TimeQA --print_prompt
 python SFT_with_LoRA_text_to_TG_Trans.py --dataset TimeQA --test --shorten_story --ICL --rewrite --print_prompt --transferred
@@ -67,11 +66,9 @@ python SFT_with_LoRA_text_to_TG_Trans.py --dataset TimeQA --test --shorten_story
 # Obtain CoT sampling prob
 python CoT_bootstrap.py --dataset TGQA --print_prompt
 
-
 # Train and test on TGQA dataset
 python SFT_with_LoRA_TG_Reasoning.py --dataset TGQA --train --CoT_bs --data_aug --print_prompt
 python SFT_with_LoRA_TG_Reasoning.py --dataset TGQA --test --ICL --rewrite --print_prompt
-
 
 # To obtain inference results based on perplexity
 python SFT_with_LoRA_TG_Reasoning_ppl.py --dataset TGQA --ICL --rewrite --print_prompt
@@ -85,7 +82,6 @@ python SFT_with_LoRA_TG_Reasoning_ppl.py --dataset TGQA --ICL --rewrite --print_
 # Test on TGQA with Llama2-13b with ICL only
 python Inference_in_context_learning.py --dataset TGQA --model Llama2-13b --CoT --ICL --rewrite --print_prompt
 
-
 # To obtain inference results based on perplexity
 python Inference_in_context_learning_ppl.py --dataset TGQA --model Llama2-13b --CoT --ICL --rewrite --print_prompt
 ```
@@ -95,7 +91,6 @@ python Inference_in_context_learning_ppl.py --dataset TGQA --model Llama2-13b --
 # Train and test on TGQA dataset
 python SFT_with_LoRA_TG_Reasoning.py --dataset TGQA --train --print_prompt --no_TG
 python SFT_with_LoRA_TG_Reasoning.py --dataset TGQA --test --ICL --rewrite --print_prompt --no_TG
-
 
 # To obtain inference results based on perplexity
 python SFT_with_LoRA_TG_Reasoning_ppl.py --dataset TGQA --ICL --rewrite --print_prompt --no_TG
