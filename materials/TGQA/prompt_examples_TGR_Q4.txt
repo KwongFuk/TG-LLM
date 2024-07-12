@@ -1,6 +1,6 @@
 Input:
 {
-    "Timeline":[
+    "Timeline": [
         "(Adam Campbell was born in Harrison) starts at 1948",
         "(John Anderson was born in Harrison) starts at 1948",
         "(Jaden Parker was married to Adam Campbell) starts at 1983",

@@ -25,13 +25,14 @@ def my_generate_prompt_CoT_bs(TG, EK, Q):
 
 
 
-def my_generate_prompt_TG_Reasoning(dataset_name, split_name, TG, EK, Q, CoT, A, f_ICL, Q_type=None, mode=None, eos_token=""):
+def my_generate_prompt_TG_Reasoning(dataset_name, split_name, story, TG, EK, Q, CoT, A, f_ICL, Q_type=None, mode=None, eos_token="", f_no_TG=False):
     '''
     Generate the prompt for the model.
 
     args:
         dataset_name: string, dataset name
         split_name: string, split name
+        story: string, story
         TG: list of strings or string, temporal graph
         EK: list of strings or string, exteral knowledge
         Q: string, question
@@ -40,26 +41,28 @@ def my_generate_prompt_TG_Reasoning(dataset_name, split_name, TG, EK, Q, CoT, A,
         Q_type: string, question type
         mode: string, mode
         eos_token: string, eos token
+        f_no_TG: bool, whether to use the temporal graph or original story as context
 
     return:
         prompt: string, the prompt
     '''
     if f_ICL and mode == 'test':
         if dataset_name == 'TGQA':
-            Q_type = f'Q{Q_type}'
+            split_name = f'_Q{Q_type}'
 
-        if Q_type is None:
-            file_path = f'../materials/{dataset_name}/prompt_examples_TGR{split_name}.txt'
-        else:
-            file_path = f'../materials/{dataset_name}/prompt_examples_TGR_{Q_type}.txt'
+        strategy = 'TGR' if not f_no_TG else 'storyR'        
+        file_path = f'../materials/{dataset_name}/prompt_examples_{strategy}{split_name}.txt'
+
         with open(file_path) as txt_file:
             prompt_examples = txt_file.read()
 
-  
+
+    context = f'"Timeline":\n{json.dumps(TG)},\n' if not f_no_TG else f'"Story":\n{json.dumps(story)},\n'
+
     if f_ICL and mode == 'test':
-        prompt = f'Example:\n\n{prompt_examples}\n\nTest:\n\nInput:\n{{\n"Timeline":\n{json.dumps(TG)},\n"Question": {json.dumps(Q)},'
+        prompt = f'Example:\n\n{prompt_examples}\n\nTest:\n\nInput:\n{{\n{context}"Question": {json.dumps(Q)},'
     else:
-        prompt = f'Input:\n{{\n"Timeline":\n{json.dumps(TG)},\n"Question": {json.dumps(Q)},'
+        prompt = f'Input:\n{{\n{context}"Question": {json.dumps(Q)},'
 
     if EK is not None:
         prompt += f'\n"Useful information":\n{json.dumps(EK)},'

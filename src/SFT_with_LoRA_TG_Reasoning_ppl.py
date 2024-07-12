@@ -23,6 +23,7 @@ parser.add_argument('--rewrite', action='store_true')
 parser.add_argument('--print_prompt', action='store_true')
 parser.add_argument('--unit_test', action='store_true')
 parser.add_argument('--transferred', action='store_true')
+parser.add_argument('--no_TG', action='store_true')
 
 args = parser.parse_args()
 
@@ -36,6 +37,7 @@ f_rewrite = args.rewrite   # whether rewrite existing test results
 f_print_example_prompt = args.print_prompt   # whether to print the example prompt for the model
 f_unit_test = args.unit_test   # whether to run the unit test (only for debugging)
 f_transferred = args.transferred  # whether to use the TG results from transfer learning
+f_no_TG = args.no_TG  # whether to use the temporal graph or original story as context
 
 ###########################
 
@@ -68,7 +70,8 @@ if f_print_example_prompt:
         sample = data_test[i]
         story_id = process_id(dataset_name, sample['id'])
         if story_id in TG_pred:
-            prompt = my_generate_prompt_TG_Reasoning(dataset_name, split_name, TG_pred[story_id], sample['external knowledge'], sample['question'], None, None, f_ICL, Q_type=sample['Q-Type'], mode='test')
+            prompt = my_generate_prompt_TG_Reasoning(dataset_name, split_name, sample['story'], TG_pred[story_id], sample['external knowledge'], 
+                                                     sample['question'], None, None, f_ICL, Q_type=sample['Q-Type'], mode='test', f_no_TG=f_no_TG)
             print(prompt)
             print('===============================')
 
@@ -83,23 +86,24 @@ model = AutoModelForCausalLM.from_pretrained(model_name,
                                             load_in_8bit=True,
                                             device_map="auto"
                                             )
+strategy = 'TGR' if not f_no_TG else 'storyR'
 
 
 tokenizer.pad_token_id = 0
 tokenizer.padding_side = 'right'
 
-peft_model_id = f"../model_weights/{dataset_name}_TGR{split_name}/final"
+peft_model_id = f"../model_weights/{dataset_name}_{strategy}{split_name}/final"
 peft_model = PeftModel.from_pretrained(model, peft_model_id, torch_dtype=torch.float16, offload_folder="lora_results/lora_7/temp")
 peft_model.eval()
 
-folder_path = f'../results/{dataset_name}_TGR{split_name}_ppl'
+folder_path = f'../results/{dataset_name}_{strategy}{split_name}_ppl'
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
 
-folder_path_past_res = f'../results/{dataset_name}_TGR{split_name}'
+folder_path_past_res = f'../results/{dataset_name}_{strategy}{split_name}'
 if not os.path.exists(folder_path_past_res):
-    print('Error! Please first generate the CoT results with the command "python Inference_in_context_learning.py".')
+    print('Error! Please first generate the CoT results.')
     sys.exit()
 
 
@@ -117,7 +121,8 @@ for i in tqdm(range(len(data_test))):
     story_id = process_id(dataset_name, sample['id'])
     if story_id not in TG_pred:
         continue
-    cur_prompt = my_generate_prompt_TG_Reasoning(dataset_name, split_name, TG_pred[story_id], sample['external knowledge'], sample['question'], None, None, f_ICL, Q_type=sample['Q-Type'], mode='test')
+    cur_prompt = my_generate_prompt_TG_Reasoning(dataset_name, split_name, sample['story'], TG_pred[story_id], sample['external knowledge'], 
+                                                 sample['question'], None, None, f_ICL, Q_type=sample['Q-Type'], mode='test', f_no_TG=f_no_TG)
 
     file_path_past_res = f'{folder_path_past_res}/{str(i)}.json'
     if not os.path.exists(file_path_past_res):

@@ -99,7 +99,7 @@ if not os.path.exists(folder_path):
 if f_using_CoT:
     folder_path_past_res = f'../results/{dataset_name}_ICL_{learning_setting}{split_name}_{model_name}' if f_ICL else f'../results/{dataset_name}{split_name}_{model_name}'
     if not os.path.exists(folder_path_past_res):
-        print('Error! Please first generate the CoT results with the command "python Inference_in_context_learning.py".')
+        print('Error! Please first generate the CoT results.')
         sys.exit()
 
 

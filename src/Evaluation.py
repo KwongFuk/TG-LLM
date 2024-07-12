@@ -17,7 +17,7 @@ parser.add_argument('--TGLLM', action='store_true')
 parser.add_argument('--ICL_only', action='store_true')
 parser.add_argument('--CoT', action='store_true')
 parser.add_argument('--ppl', action='store_true')
-
+parser.add_argument('--no_TG', action='store_true')
 
 args = parser.parse_args()
 
@@ -32,6 +32,7 @@ f_SFT_TGLLM = args.TGLLM   # whether use SFT with TGLLM
 f_inference_ICL = args.ICL_only   # whether use inference with ICL only
 f_using_CoT = args.CoT   # whether use CoT
 f_ppl = args.ppl   # whether use perplexity
+f_no_TG = args.no_TG  # whether to use the temporal graph or original story as context
 
 ###########################
 
@@ -43,7 +44,8 @@ learning_setting = 'SP' if not f_using_CoT else 'CoT'
 
 
 if f_SFT_TGLLM:
-    folder_path = f'../results/{dataset_name}_TGR{split_name}'
+    strategy = 'TGR' if not f_no_TG else 'storyR'
+    folder_path = f'../results/{dataset_name}_{strategy}{split_name}'
 else:
     folder_path = f'../results/{dataset_name}_ICL_{learning_setting}{split_name}_{model_name}' if f_inference_ICL else f'../results/{dataset_name}{split_name}_{model_name}'
 
