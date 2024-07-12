@@ -30,7 +30,8 @@ TG-LLM/
 └── src/
 ```
 
-Preparation
+<h4> Preparation: </h4>
+
 ```sh
 # git clone this repo
 
@@ -45,7 +46,7 @@ mkdir results
 cd src
 ```
 
-For our TG-LLM framework:
+<h4> For our TG-LLM framework: </h4>
 
 - Step 1: text-to-temporal graph translation
 
@@ -76,7 +77,10 @@ python SFT_with_LoRA_TG_Reasoning.py --dataset TGQA --test --ICL --rewrite --pri
 python SFT_with_LoRA_TG_Reasoning_ppl.py --dataset TGQA --ICL --rewrite --print_prompt
 ```
 
-For other leading LLMs (GPT series/Llama2 family):
+<h4> For other leading LLMs (GPT series/Llama2 family): </h4>
+
+- Use in-context learning only
+
 ```sh
 # Test on TGQA with Llama2-13b with ICL only
 python Inference_in_context_learning.py --dataset TGQA --model Llama2-13b --CoT --ICL --rewrite --print_prompt
@@ -85,7 +89,20 @@ python Inference_in_context_learning.py --dataset TGQA --model Llama2-13b --CoT 
 python Inference_in_context_learning_ppl.py --dataset TGQA --model Llama2-13b --CoT --ICL --rewrite --print_prompt
 ```
 
-For evaluation:
+- Use general SFT (with story, question, CoT, answer)
+```sh
+# Train and test on TGQA dataset
+python SFT_with_LoRA_TG_Reasoning.py --dataset TGQA --train --print_prompt --no_TG
+python SFT_with_LoRA_TG_Reasoning.py --dataset TGQA --test --ICL --rewrite --print_prompt --no_TG
+```
+```sh
+# To obtain inference results based on perplexity
+python SFT_with_LoRA_TG_Reasoning_ppl.py --dataset TGQA --ICL --rewrite --print_prompt --no_TG
+```
+
+
+<h4> For evaluation: </h4>
+
 ```sh
 # To evaluate our framework
 python Evaluation.py --dataset TGQA --model Llama2-13b --TGLLM
