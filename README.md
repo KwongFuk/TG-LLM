@@ -105,10 +105,13 @@ python SFT_with_LoRA_TG_Reasoning_ppl.py --dataset TGQA --ICL --rewrite --print_
 
 ```sh
 # To evaluate our framework
-python Evaluation.py --dataset TGQA --model Llama2-13b --TGLLM
+python Evaluation.py --dataset TGQA --model Llama2-13b --SFT
 
 # To evaluate other leading LLMs with ICL only
 python Evaluation.py --dataset TGQA --model Llama2-13b --ICL_only --CoT
+
+# To evaluate other leading LLMs with general SFT
+python Evaluation.py --dataset TGQA --model Llama2-13b --SFT --no_TG
 ```
 
 ## Prompt Format
