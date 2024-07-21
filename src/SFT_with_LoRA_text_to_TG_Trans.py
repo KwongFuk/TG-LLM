@@ -93,11 +93,15 @@ model_name = "meta-llama/Llama-2-13b-hf"  # can be changed to other models
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 
+
 model = AutoModelForCausalLM.from_pretrained(model_name,
                                             load_in_8bit=True,
                                             device_map="auto"
                                             )
 
+# this should be set for finutning and batched inference
+tokenizer.add_special_tokens({"pad_token": "<PAD>"})
+model.resize_token_embeddings(len(tokenizer))
 
 
 if f_train:
@@ -154,7 +158,6 @@ if f_test:
         input_prompts.append(cur_prompt)
         samples.append(sample)
         file_paths.append(file_path)
-
  
         # collect the prompts as a batch
         if len(input_prompts) >= batch_size:

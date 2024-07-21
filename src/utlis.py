@@ -402,8 +402,10 @@ def shorten_story(story, max_len=1500):
 
 def parse_TG_pred(pred):
     try:
-        res = eval('{' + pred.split('{')[1].split('}')[0] + '}')
-        return res['Timeline']
+        res = pred[len(pred.split('{')[0]):-len(pred.split('}')[-1])]
+        res = eval(res)
+        TG = res['Timeline'] if 'Timeline' in res else res['timeline']
+        return TG
     except:
         pass
     
@@ -442,8 +444,11 @@ def obtain_TG_pred(dataset_name, f_transferred):
 
 def parse_TGR_pred(pred):
     try:
-        res = eval('{' + pred.split('{')[1].split('}')[0] + '}')
-        return res['Thought'], res['Answer']
+        res = pred[len(pred.split('{')[0]):-len(pred.split('}')[-1])]
+        res = eval(res)
+        CoT = res['Thought'] if 'Thought' in res else res['thought']
+        ans = res['Answer'] if 'Answer' in res else res['answer']
+        return CoT, ans
     except:
         pass
     

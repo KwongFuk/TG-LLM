@@ -126,9 +126,9 @@ def run_one_batch_CoT_bs(model, tokenizer, input_prompts, samples):
         combinations = list(itertools.product(cur_sample['CoT'], neg_ans + cur_sample['answer']))
         cur_prompts = []
         context_len = []
-        for comb in combinations:            
-            context = input_prompts[j] + f'\n{{\n"Thought": ""{json.dumps(comb[0])}"",\n"Answer":'
-            final = context + f'{json.dumps([comb[1]])}\n}}'
+        for comb in combinations:
+            context = input_prompts[j] + f'{{\n"Thought": ""{json.dumps(comb[0])}"",\n"Answer":'
+            final = context + f'{json.dumps([comb[1]])}\n}}```'
 
             len_bf = tokenizer(context, return_tensors="pt")["input_ids"].shape[1]
             len_af = tokenizer(final, return_tensors="pt")["input_ids"].shape[1]
@@ -183,7 +183,7 @@ def run_one_batch_ppl(model, tokenizer, input_prompts, samples, file_paths, usin
         for comb in combinations:
             context = comb[0]
             if using_json:
-                final = context + f'{json.dumps([comb[1]])}\n}}'
+                final = context + f'{json.dumps([comb[1]])}\n}}```'
             else:
                 final = context + comb[1]
             cur_prompts.append(final)
@@ -235,10 +235,9 @@ def run_one_batch_generation(model, tokenizer, input_prompts, samples, file_path
             eos_token_id=tokenizer.eos_token_id,
             )
 
-
     for j in range(len(input_prompts)):
         op = tokenizer.decode(generation_output[j], skip_special_tokens=True)
-        op = op[len(input_prompts[j]):]
+        op = op[len(input_prompts[j]) - len('\n```json'):]
         cur_sample = samples[j]
         cur_sample.update({'prediction': op})
 
@@ -259,15 +258,10 @@ def SFT_with_LoRA(model, tokenizer, output_dir, f_unit_test, formatting_func, da
         task_type="CAUSAL_LM",
     )
 
-    # this should be set for finutning and batched inference
-    tokenizer.add_special_tokens({"pad_token": "<PAD>"})
-    model.resize_token_embeddings(len(tokenizer))
-
     # Loading in 8 bit ..."
     model = prepare_model_for_kbit_training(model)
     model = get_peft_model(model, lora_config)
 
-    
     per_device_train_batch_size = batch_size
     gradient_accumulation_steps = 4
     per_device_eval_batch_size = batch_size

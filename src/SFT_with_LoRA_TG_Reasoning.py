@@ -188,6 +188,11 @@ model = AutoModelForCausalLM.from_pretrained(model_name,
                                             load_in_8bit=True,
                                             device_map="auto"
                                             )
+
+# this should be set for finutning and batched inference
+tokenizer.add_special_tokens({"pad_token": "<PAD>"})
+model.resize_token_embeddings(len(tokenizer))
+
 strategy = 'TGR' if not f_no_TG else 'storyR' 
 
 
