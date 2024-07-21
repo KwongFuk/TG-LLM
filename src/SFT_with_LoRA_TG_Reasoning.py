@@ -98,7 +98,6 @@ def read_data(dataset_name, prefix, split, f_CoT_bs=False, f_data_aug=False):
         dataset = Dataset.from_dict(data_dict)
 
 
-
     if f_data_aug and dataset_name in ['TGQA']:
         rel_entity_dict = collect_entity(dataset_name)
         random_entity_names = collect_entity_v2(dataset_name, rel_entity_dict)
@@ -198,20 +197,19 @@ strategy = 'TGR' if not f_no_TG else 'storyR'
 
 if f_train:
     def formatting_func(sample):
-        '''
-        Given the sample, generate the prompt for the model.
-        '''
+        '''Given the sample, generate the prompt for the model.'''
         output = []
         for s, g, e, q, cot, a in zip(sample['story'], sample['TG'], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer']):
             op = my_generate_prompt_TG_Reasoning(dataset_name, split_name, s, g, e, q, cot, a, f_ICL, mode='train', eos_token="</s>", f_no_TG=f_no_TG)
             output.append(op)
-
         return output
 
     output_dir = f"../model_weights/{dataset_name}_{strategy}{split_name}"
-    SFT_with_LoRA(model, tokenizer, output_dir, f_unit_test, formatting_func, data_train, data_val, 12, 2048)
+    resume_from_checkpoint = None  # you can set this to the checkpoint path if you want to resume training from a checkpoint
+    max_steps = 5 if f_unit_test else 50
+    SFT_with_LoRA(model, tokenizer, output_dir, formatting_func, data_train, data_val, 12, 2048, max_steps, resume_from_checkpoint)
 
-
+ 
 if f_test:
     tokenizer.pad_token_id = 0
     tokenizer.padding_side = 'left'
@@ -225,10 +223,7 @@ if f_test:
         os.mkdir(folder_path)
 
     batch_size = 8
-
-    input_prompts = []
-    file_paths = []
-    samples = []
+    input_prompts, file_paths, samples = [], [], []
     for i in tqdm(range(len(data_test))):
         file_path = folder_path + f'/{str(i)}.json'
         if os.path.exists(file_path) and (not f_rewrite):
@@ -248,10 +243,8 @@ if f_test:
         # collect the prompts as a batch
         if len(input_prompts) >= batch_size:
             run_one_batch_generation(peft_model, tokenizer, input_prompts, samples, file_paths)
-            input_prompts = []
-            file_paths = []
-            samples = []
+            input_prompts, file_paths, samples = [], [], []
 
-
+    # deal with the last batch
     if len(input_prompts) > 0:
         run_one_batch_generation(peft_model, tokenizer, input_prompts, samples, file_paths)

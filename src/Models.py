@@ -247,7 +247,7 @@ def run_one_batch_generation(model, tokenizer, input_prompts, samples, file_path
     return
 
 
-def SFT_with_LoRA(model, tokenizer, output_dir, f_unit_test, formatting_func, data_train, data_val, batch_size, max_seq_length):
+def SFT_with_LoRA(model, tokenizer, output_dir, formatting_func, data_train, data_val, batch_size, max_seq_length, max_steps, resume_from_checkpoint=None):
     # lora config
     lora_config = LoraConfig(
         r=8,
@@ -271,7 +271,6 @@ def SFT_with_LoRA(model, tokenizer, output_dir, f_unit_test, formatting_func, da
     logging_steps = 10
     learning_rate = 5e-4
     max_grad_norm = 0.3
-    max_steps = 5 if f_unit_test else 50
     warmup_ratio = 0.03
     evaluation_strategy="steps"
     lr_scheduler_type = "constant"
@@ -292,9 +291,9 @@ def SFT_with_LoRA(model, tokenizer, output_dir, f_unit_test, formatting_func, da
                 lr_scheduler_type=lr_scheduler_type,
                 ddp_find_unused_parameters=False,
                 eval_accumulation_steps=eval_accumulation_steps,
-                per_device_eval_batch_size=per_device_eval_batch_size
+                per_device_eval_batch_size=per_device_eval_batch_size,
+                resume_from_checkpoint=resume_from_checkpoint
             )
-
 
     # SFT with lora
     trainer = SFTTrainer(
@@ -313,7 +312,12 @@ def SFT_with_LoRA(model, tokenizer, output_dir, f_unit_test, formatting_func, da
         if "norm" in name:
             module = module.to(torch.float32)
 
-    trainer.train()
+    if resume_from_checkpoint:
+        print(f"Resuming from checkpoint: {resume_from_checkpoint}")
+        trainer.train(resume_from_checkpoint=True)
+    else:
+        trainer.train()
+
     trainer.save_model(f"{output_dir}/final")
     return
 

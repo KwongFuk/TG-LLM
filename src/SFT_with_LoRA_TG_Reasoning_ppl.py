@@ -113,9 +113,7 @@ if not os.path.exists(folder_path_past_res):
 
 
 batch_size = 4
-input_prompts = []
-file_paths = []
-samples = []
+input_prompts, file_paths, samples = [], [], []
 for i in tqdm(range(len(data_test))):
     file_path = folder_path + f'/{str(i)}.json'
     if os.path.exists(file_path) and (not f_rewrite):
@@ -148,10 +146,8 @@ for i in tqdm(range(len(data_test))):
     # collect the prompts as a batch
     if len(input_prompts) >= batch_size:
         run_one_batch_ppl(peft_model, tokenizer, input_prompts, samples, file_paths)
-        input_prompts = []
-        file_paths = []
-        samples = []
+        input_prompts, file_paths, samples = [], [], []
 
-
+# deal with the last batch
 if len(input_prompts) > 0:
     run_one_batch_ppl(peft_model, tokenizer, input_prompts, samples, file_paths)

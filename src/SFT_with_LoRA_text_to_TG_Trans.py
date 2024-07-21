@@ -106,21 +106,22 @@ model.resize_token_embeddings(len(tokenizer))
 
 if f_train:
     def formatting_func(sample):
-        '''
-        Given a sample, generate the prompt for the model
-        '''
+        '''Given a sample, generate the prompt for the model'''
         output = []
         for s, g, e, r, t in zip(sample['story'], sample['TG'], sample['entities'], sample['relation'], sample['times']):
             op = my_generate_prompt_TG_trans(dataset_name, s, g, e, r, t, f_ICL, f_shorten_story, f_hard_mode, 
                                             transferred_dataset_name, mode='train')
             output.append(op)
-
         return output
 
     output_dir = f"../model_weights/{dataset_name}_story_TG_trans"
     if transferred_dataset_name is not None:
         output_dir = f"../model_weights/{dataset_name}_to_{transferred_dataset_name}_story_TG_trans"
-    SFT_with_LoRA(model, tokenizer, output_dir, f_unit_test, formatting_func, data_train, data_val, 4, 4096)
+
+    resume_from_checkpoint = None  # you can set this to the checkpoint path if you want to resume training from a checkpoint
+    max_steps = 5 if f_unit_test else 50
+    SFT_with_LoRA(model, tokenizer, output_dir, formatting_func, data_train, data_val, 4, 4096, max_steps, resume_from_checkpoint)
+
 
 
 if f_test:
@@ -142,10 +143,7 @@ if f_test:
 
     batch_size = 4
     max_new_tokens = 1024 if dataset_name in 'TGQA' else 512  # Depends on the size of the (relevant) temporal graph
-
-    input_prompts = []
-    file_paths = []
-    samples = []
+    input_prompts, file_paths, samples = [], [], []
     for i in tqdm(range(len(data_test))):
         file_path = folder_path + f'/{str(i)}.json'
         if (os.path.exists(file_path)) and (not f_rewrite):
@@ -154,7 +152,6 @@ if f_test:
         sample = data_test[i]
         cur_prompt = my_generate_prompt_TG_trans(dataset_name, sample['story'], None, sample['entities'], sample['relation'], sample['times'], 
                                                  f_ICL, f_shorten_story, f_hard_mode, transferred_dataset_name, mode='test', eos_token='')
-
         input_prompts.append(cur_prompt)
         samples.append(sample)
         file_paths.append(file_path)
@@ -162,9 +159,7 @@ if f_test:
         # collect the prompts as a batch
         if len(input_prompts) >= batch_size:
             run_one_batch_generation(peft_model, tokenizer, input_prompts, samples, file_paths, max_new_tokens=max_new_tokens)
-            input_prompts = []
-            file_paths = []
-            samples = []
+            input_prompts, file_paths, samples = [], [], []
 
     # Last batch that is less than batch_size
     if len(input_prompts) > 0:
