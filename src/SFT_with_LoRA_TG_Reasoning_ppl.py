@@ -136,8 +136,9 @@ for i in tqdm(range(len(data_test))):
     CoT, _ = parse_TGR_pred(past_res['prediction'])
     if CoT is None:
         continue
-
-    cur_prompt += f'{{\n"Thought": ""{json.dumps(CoT)}"",\n"Answer":'
+    
+    CoT = CoT.replace('\n', ' ')
+    cur_prompt += f'{{\n"Thought": {json.dumps(CoT)},\n"Answer":'
 
     input_prompts.append(cur_prompt)
     samples.append(sample)

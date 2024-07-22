@@ -138,6 +138,16 @@ data_val = read_data(dataset_name, prefix, 'val', f_CoT_bs, f_data_aug)
 data_test = read_data(dataset_name, prefix, 'test')
 
 
+def add_prompt(sample):
+    sample['prompt'] = my_generate_prompt_TG_Reasoning(dataset_name, split_name, sample['story'], sample['TG'], sample['external knowledge'], 
+                                                        sample['question'], sample['CoT'], sample['answer'], 
+                                                        f_ICL, eos_token="</s>", f_no_TG=f_no_TG)
+    return sample
+
+data_train = data_train.map(add_prompt)
+data_val = data_val.map(add_prompt)
+
+
 if f_unit_test:
     data_train = create_subset(data_train, 10)
     data_val = create_subset(data_val, 10)
@@ -197,17 +207,17 @@ strategy = 'TGR' if not f_no_TG else 'storyR'
 
 if f_train:
     def formatting_func(sample):
-        '''Given the sample, generate the prompt for the model.'''
+        '''Given the sample, obtain the prompt for the model.'''
         output = []
-        for s, g, e, q, cot, a in zip(sample['story'], sample['TG'], sample['external knowledge'], sample['question'], sample['CoT'], sample['answer']):
-            op = my_generate_prompt_TG_Reasoning(dataset_name, split_name, s, g, e, q, cot, a, f_ICL, mode='train', eos_token="</s>", f_no_TG=f_no_TG)
-            output.append(op)
+        for p in sample['prompt']:
+            output.append(p)
         return output
 
     output_dir = f"../model_weights/{dataset_name}_{strategy}{split_name}"
     resume_from_checkpoint = None  # you can set this to the checkpoint path if you want to resume training from a checkpoint
-    max_steps = 5 if f_unit_test else 50
-    SFT_with_LoRA(model, tokenizer, output_dir, formatting_func, data_train, data_val, 12, 2048, max_steps, resume_from_checkpoint)
+    max_steps = 50 if dataset_name == 'TGQA' else 20
+    max_steps = 5 if f_unit_test else max_steps
+    SFT_with_LoRA(model, tokenizer, output_dir, formatting_func, data_train, data_val, 12, 2048, max_steps, resume_from_checkpoint=resume_from_checkpoint)
 
  
 if f_test:

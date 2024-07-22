@@ -3,6 +3,7 @@ import os
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
+from trl import DataCollatorForCompletionOnlyLM
 from datasets import load_dataset
 from tqdm import tqdm
 from utlis import *
@@ -47,9 +48,9 @@ f_print_example_prompt = args.print_prompt  # whether to print the example promp
 f_unit_test = args.unit_test   # whether to run the unit test (only for debugging)
 
 # If we want to test the transfer learning performance, just change the transferred dataset name.
-# Note: current dataset_name should be 'TGQA', transferred_dataset_name = None (no transfer learning)
+# Note: current dataset_name should be 'TGQA', transferred_dataset_name = None (no transfer learning) or 'TimeQA' or 'TempReason'
 transferred_dataset_name = args.transferred_dataset
-f_transferred = args.transferred  # whether to use transfer learning during test (if True, we will read the model weights learned from the transferred dataset)
+f_transferred = args.transferred  # whether to use transfer learning model during test (if True, we will read the model weights learned from the transferred dataset)
 
 ###########################
 
@@ -60,6 +61,16 @@ dataset = load_dataset("sxiong/TGQA", f'{dataset_name}_Story_TG_Trans')
 data_train = dataset['train']
 data_val = dataset['val']
 data_test = dataset['test']
+
+
+
+def add_prompt(sample):
+    sample['prompt'] = my_generate_prompt_TG_trans(dataset_name, sample['story'], sample['TG'], sample['entities'], sample['relation'], sample['times'], 
+                                                   f_ICL, f_shorten_story, f_hard_mode, transferred_dataset_name)
+    return sample
+
+data_train = data_train.map(add_prompt)
+data_val = data_val.map(add_prompt)
 
 
 if f_unit_test:
@@ -106,12 +117,10 @@ model.resize_token_embeddings(len(tokenizer))
 
 if f_train:
     def formatting_func(sample):
-        '''Given a sample, generate the prompt for the model'''
+        '''Given a sample, obtain the prompt for the model'''
         output = []
-        for s, g, e, r, t in zip(sample['story'], sample['TG'], sample['entities'], sample['relation'], sample['times']):
-            op = my_generate_prompt_TG_trans(dataset_name, s, g, e, r, t, f_ICL, f_shorten_story, f_hard_mode, 
-                                            transferred_dataset_name, mode='train')
-            output.append(op)
+        for p in sample['prompt']:
+            output.append(p)
         return output
 
     output_dir = f"../model_weights/{dataset_name}_story_TG_trans"
@@ -120,7 +129,10 @@ if f_train:
 
     resume_from_checkpoint = None  # you can set this to the checkpoint path if you want to resume training from a checkpoint
     max_steps = 5 if f_unit_test else 50
-    SFT_with_LoRA(model, tokenizer, output_dir, formatting_func, data_train, data_val, 4, 4096, max_steps, resume_from_checkpoint)
+    response_template = "### Output"
+    collator = DataCollatorForCompletionOnlyLM(response_template, tokenizer=tokenizer)  # By using this collator, we finetune the model on the output part only.
+    SFT_with_LoRA(model, tokenizer, output_dir, formatting_func, data_train, data_val, 4, 4096, max_steps, resume_from_checkpoint=resume_from_checkpoint, 
+                  collator=collator)
 
 
 

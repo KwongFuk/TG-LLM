@@ -72,7 +72,8 @@ def my_generate_prompt_TG_Reasoning(dataset_name, split_name, story, TG, EK, Q, 
     if CoT is not None and A is not None:
         if isinstance(CoT, list):
             CoT = CoT[0]
-        prompt += f'{{\n"Thought": ""{json.dumps(CoT)}"",\n"Answer": {json.dumps(A)}\n}}\n```'
+        CoT = CoT.replace('\n', ' ')
+        prompt += f'{{\n"Thought": {json.dumps(CoT)},\n"Answer": {json.dumps(A)}\n}}\n```'
     
     prompt += eos_token
     return prompt
@@ -154,12 +155,12 @@ def my_generate_prompt_TG_trans(dataset_name, story, TG, entities, relation, tim
 
     if relation is None:
         # If we do not have such information extracted from the questions, we will translate the whole story.
-        prompt = add_examples_in_prompt(f'Input:\n{{\n"Story": {json.dumps(story)},\n"Instruction": "Summary all the events as a timeline. Only return me json."\n}}\nOutput:\n```json')
+        prompt = add_examples_in_prompt(f'### Input:\n{{\n"Story": {json.dumps(story)},\n"Instruction": "Summary all the events as a timeline. Only return me json."\n}}\n ### Output: \n```json')
     else:
         if f_hard_mode or entities is None or times is None:
-            prompt = add_examples_in_prompt(f'Input:\n{{\n"Story": {json.dumps(story)},\n"Instruction": "Summary {relation} as a timeline. Only return me json."\n}}\nOutput:\n```json')
+            prompt = add_examples_in_prompt(f'### Input:\n{{\n"Story": {json.dumps(story)},\n"Instruction": "Summary {relation} as a timeline. Only return me json."\n}}\n ### Output: \n```json')
         else:
-            prompt = add_examples_in_prompt(f'Input:\n{{\n"Story": {json.dumps(story)},\n"Instruction": "Given the time periods: {times}, summary {relation} as a timeline. Choose from {entities}. Only return me json."\n}}\nOutput:\n```json')
+            prompt = add_examples_in_prompt(f'### Input:\n{{\n"Story": {json.dumps(story)},\n"Instruction": "Given the time periods: {times}, summary {relation} as a timeline. Choose from {entities}. Only return me json."\n}}\n ### Output: \n```json')
              
     # For training data, we provide the TG as label.
     if TG is not None:

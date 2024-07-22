@@ -127,7 +127,8 @@ def run_one_batch_CoT_bs(model, tokenizer, input_prompts, samples):
         cur_prompts = []
         context_len = []
         for comb in combinations:
-            context = input_prompts[j] + f'{{\n"Thought": ""{json.dumps(comb[0])}"",\n"Answer":'
+            CoT = comb[0].replace('\n', ' ')
+            context = input_prompts[j] + f'{{\n"Thought": {json.dumps(CoT)},\n"Answer":'
             final = context + f'{json.dumps([comb[1]])}\n}}```'
 
             len_bf = tokenizer(context, return_tensors="pt")["input_ids"].shape[1]
@@ -247,7 +248,8 @@ def run_one_batch_generation(model, tokenizer, input_prompts, samples, file_path
     return
 
 
-def SFT_with_LoRA(model, tokenizer, output_dir, formatting_func, data_train, data_val, batch_size, max_seq_length, max_steps, resume_from_checkpoint=None):
+def SFT_with_LoRA(model, tokenizer, output_dir, formatting_func, data_train, data_val, batch_size, max_seq_length, max_steps, resume_from_checkpoint=None,
+                  collator=None):
     # lora config
     lora_config = LoraConfig(
         r=8,
@@ -304,7 +306,8 @@ def SFT_with_LoRA(model, tokenizer, output_dir, formatting_func, data_train, dat
         formatting_func=formatting_func,
         max_seq_length=max_seq_length,
         tokenizer=tokenizer,
-        args=training_args
+        args=training_args,
+        data_collator=collator
     )
 
     # We will also pre-process the model by upcasting the layer norms in float 32 for more stable training
