@@ -13,6 +13,6 @@ Input:
 }
 Output:
 {
-    "Thought": """Since ( before Dec 1955 ) is contained in the time period ( May 1955 - Apr 1956 ) .""",
+    "Thought": "Since ( before Dec 1955 ) is contained in the time period ( May 1955 - Apr 1956 ) .",
     "Answer": ["Ulster Unionist MP for South Antrim"]
 }

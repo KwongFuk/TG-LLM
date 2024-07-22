@@ -13,6 +13,6 @@ Input:
 }
 Output:
 {
-    "Thought": """Based on the timeline, we can obtain the answer.""",
+    "Thought": "Based on the timeline, we can obtain the answer.",
     "Answer": ["Ulster Unionist MP for South Antrim"]
 }

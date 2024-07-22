@@ -7,6 +7,6 @@ Input:
 }
 Output:
 {
-    "Thought": """Since ( Jul, 1960 ) is in the time period of ( from Nov, 1959 to Aug, 1960 ).""",
+    "Thought": "Since ( Jul, 1960 ) is in the time period of ( from Nov, 1959 to Aug, 1960 ).",
     "Answer": ["United States senator"]
 }
