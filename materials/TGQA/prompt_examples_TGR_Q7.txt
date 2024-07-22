@@ -40,6 +40,6 @@ Input:
 }
 Output:
 {
-    "Thought": """To solve this problem, we need to look at the timeline of events and identify what happened immediately after the specific event (Nathan Reed played for Chelsea United FC) starts. \n\nLooking at the timeline: \n(Nathan Reed played for Chelsea United FC) starts at 2005\n\nThe next time is 2006. From the timeline, we can find (Nathan Reed played for Chelsea United FC) ends at 2006.""",
+    "Thought": "To solve this problem, we need to look at the timeline of events and identify what happened immediately after the specific event (Nathan Reed played for Chelsea United FC) starts.   Looking at the timeline:  (Nathan Reed played for Chelsea United FC) starts at 2005.  The next time is 2006. From the timeline, we can find (Nathan Reed played for Chelsea United FC) ends at 2006.",
     "Answer": ["(Nathan Reed played for Chelsea United FC) ends"]
 }

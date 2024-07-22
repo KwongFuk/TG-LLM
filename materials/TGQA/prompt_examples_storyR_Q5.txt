@@ -13,6 +13,6 @@ Input:
 }
 Output:
 {
-    "Thought": """To solve this problem, we need to determine if the events (Oliver Anderson won prize Steven Reynolds Trophy) and (Oliver Anderson won prize Smithson Award) started in the same year. The approach is straightforward:\n\nIdentify the years when each event started.\n(Oliver Anderson won prize Steven Reynolds Trophy) starts at 1962\n(Oliver Anderson won prize Smithson Award) starts at 1972\n\nSince these two events have different starting years.""",
+    "Thought": "To solve this problem, we need to determine if the events (Oliver Anderson won prize Steven Reynolds Trophy) and (Oliver Anderson won prize Smithson Award) started in the same year. The approach is straightforward:  Identify the years when each event started. (Oliver Anderson won prize Steven Reynolds Trophy) starts at 1962, (Oliver Anderson won prize Smithson Award) starts at 1972.  Since these two events have different starting years.",
     "Answer": ["False"]
 }

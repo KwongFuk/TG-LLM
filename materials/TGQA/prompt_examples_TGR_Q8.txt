@@ -27,6 +27,6 @@ Input:
 }
 Output:
 {
-    "Thought": """To determine whether the statement is true or false, we need to compare the durations of (Liam Mitchell was married to Maddox Reynolds) and (Emma Scott was married to Liam Mitchell). The duration for each event can be calculated as follows:\n\n(Liam Mitchell was married to Maddox Reynolds):\n(Liam Mitchell was married to Maddox Reynolds) starts at 1922\n(Liam Mitchell was married to Maddox Reynolds) ends at 1928\n1928 - 1922 = 6\n\n(Emma Scott was married to Liam Mitchell):\n(Emma Scott was married to Liam Mitchell) starts at 1916\n(Emma Scott was married to Liam Mitchell) ends at 1918\n1918 - 1916 = 2\n\nNow, we compare the duration of the two events: 6 is greater than 2.""",
+    "Thought": "To determine whether the statement is true or false, we need to compare the durations of (Liam Mitchell was married to Maddox Reynolds) and (Emma Scott was married to Liam Mitchell). The duration for each event can be calculated as follows:  (Liam Mitchell was married to Maddox Reynolds): (Liam Mitchell was married to Maddox Reynolds) starts at 1922, (Liam Mitchell was married to Maddox Reynolds) ends at 1928, 1928 - 1922 = 6.  (Emma Scott was married to Liam Mitchell): (Emma Scott was married to Liam Mitchell) starts at 1916, (Emma Scott was married to Liam Mitchell) ends at 1918, 1918 - 1916 = 2.  Now, we compare the duration of the two events: 6 is greater than 2.",
     "Answer": ["True"]
 }

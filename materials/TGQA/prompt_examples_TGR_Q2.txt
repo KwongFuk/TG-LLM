@@ -28,6 +28,6 @@ Input:
 }
 Output:
 {
-    "Thought": """To solve this problem, we need to calculate the duration of the event (David Adams (actor) was married to Sophia Evans). This can be done by finding the difference between the start and end dates of the event. Based on the provided information: (David Adams (actor) was married to Sophia Evans) starts at 1934 (David Adams (actor) was married to Sophia Evans) ends at 1939. To find the duration, we subtract the start year from the end year: 1939 - 1934 = 5""",
+    "Thought": "To solve this problem, we need to calculate the duration of the event (David Adams (actor) was married to Sophia Evans). This can be done by finding the difference between the start and end dates of the event. Based on the provided information: (David Adams (actor) was married to Sophia Evans) starts at 1934, (David Adams (actor) was married to Sophia Evans) ends at 1939. To find the duration, we subtract the start year from the end year: 1939 - 1934 = 5",
     "Answer": ["5 years"]
 }
