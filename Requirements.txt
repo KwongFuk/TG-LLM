@@ -1,4 +1,4 @@
-python = 3.10
-torch = 2.1.0
-transformers = 4.34.1
-datasets = 2.14.6
+python == 3.10
+torch == 2.1.0
+transformers == 4.34.1
+datasets == 2.14.6
